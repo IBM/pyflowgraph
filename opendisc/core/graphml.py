@@ -212,13 +212,17 @@ class GraphMLWriter(BaseGraphMLWriter):
         """ Reimplemented to handle JSON data.
         """
         # JSON clean first to handle conversion of numpy arrays, tuples, etc.
+        if isinstance(value, bytes):
+            value = value.decode('ascii')
         value = json_clean(value)
+
+        # Convert Python data type to GraphML data type.
         element_type = type(value)
         if element_type not in self.xml_type:
             raise nx.NetworkXError('GraphML writer does not support '
                                    '%s as data values.' % element_type)
-        
         xml_type = self.xml_type[element_type]
+
         key_id = self.get_key(name, xml_type, scope, default)
         data_element = Element('data', key=key_id)
         if xml_type == 'json':
