@@ -4,11 +4,12 @@ setup_args = {
     'name': 'opendisc',
     'version': '0.1',
     'description': 'Open Discovery program analysis for Python',
+    'license': 'ASL 2.0',
+    'author': 'Evan Patterson',
+    'author_email': 'epatters@stanford.edu',
     'include_package_data': True,
     'packages': find_packages(),
     'zip_safe': False,
-    'author': 'Evan Patterson',
-    'author_email': 'evan.patterson@ibm.com',
     'install_requires': [
         # core package
         'pathlib2',
