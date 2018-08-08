@@ -145,7 +145,7 @@ class IntegrationTestFlowGraph(unittest.TestCase):
         target.remove_node(target.graph['output_node'])
         target.add_node('read', qual_name='_make_parser_function.<locals>.parser_f',
                         annotation='python/pandas/read-table')
-        target.add_node('drop', qual_name='NDFrame.drop')
+        target.add_node('drop', qual_name='DataFrame.drop')
         target.add_node('values', qual_name='DataFrame.__getattribute__',
                         slot='values')
         target.add_edge('read', 'drop', annotation='python/pandas/data-frame',
@@ -214,7 +214,7 @@ class IntegrationTestFlowGraph(unittest.TestCase):
         target.remove_node(target.graph['output_node'])
         target.add_node('read', qual_name='_make_parser_function.<locals>.parser_f',
                         annotation='python/pandas/read-table')
-        target.add_node('X', qual_name='NDFrame.drop')
+        target.add_node('X', qual_name='DataFrame.drop')
         target.add_node('y', qual_name='DataFrame.__getitem__')
         target.add_node('lm', qual_name='LinearRegression.__init__',
                         annotation='python/sklearn/linear-regression')
