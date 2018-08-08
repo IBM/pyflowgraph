@@ -47,7 +47,7 @@ class TestAnnotationDB(unittest.TestCase):
     def test_basic_filter(self):
         """ Test a simple, multi-document query.
         """
-        query = {'language': 'python', 'package': 'opendisc', 'id': 'foo'}
+        query = {'package': 'opendisc', 'id': 'foo'}
         notes = list(self.db.filter(query))
         self.assertEqual(len(notes), 1)
         self.assertEqual(notes[0]['id'], 'foo')

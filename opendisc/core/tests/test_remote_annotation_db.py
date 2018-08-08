@@ -30,14 +30,11 @@ class TestRemoteAnnotationDB(unittest.TestCase):
     def test_load_package(self):
         """ Test loading annotations for a single package.
         """
-        query = {
-            "language": "python",
-            "package": "pandas",
-        }
+        query = { "package": "pandas" }
         docs = list(self.db.filter(query))
         self.assertEqual(docs, [])
         
-        self.assertTrue(self.db.load_package("python", "pandas"))
+        self.assertTrue(self.db.load_package("pandas"))
         docs = list(self.db.filter(query))
         self.assertGreater(len(docs), 0)
         
@@ -46,9 +43,9 @@ class TestRemoteAnnotationDB(unittest.TestCase):
         self.assertTrue('data-frame' in ids)
         
         # Don't load twice!
-        self.assertFalse(self.db.load_package("python", "pandas"))
+        self.assertFalse(self.db.load_package("pandas"))
     
     def test_load_unannotated_package(self):
         """ Test that no requests are made for unannotated packages.
         """
-        self.assertFalse(self.db.load_package("python", "XXX"))
+        self.assertFalse(self.db.load_package("XXX"))

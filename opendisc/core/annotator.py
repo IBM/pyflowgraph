@@ -116,8 +116,7 @@ class Annotator(HasTraits):
         """
         # Ensure package annotations have been loaded.
         if isinstance(self.db, RemoteAnnotationDB):
-            package = query['package']
-            self.db.load_package('python', package)
+            self.db.load_package(query['package'])
         
         return self.db.filter(query)
     
