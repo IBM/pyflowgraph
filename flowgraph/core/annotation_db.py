@@ -27,7 +27,7 @@ class AnnotationDB(HasTraits):
     """ An in-memory JSON database of object and function annotations.
     
     The class contains no Python-specific annotation logic. For that,
-    see `opendisc.kernel.trace.annotator`.
+    see `flowgraph.kernel.trace.annotator`.
     """
     
     # Underlying in-memory database backend.

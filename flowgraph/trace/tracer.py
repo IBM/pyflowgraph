@@ -26,7 +26,7 @@ from .trace_event import TraceEvent, TraceCall, TraceReturn
 
 
 class Tracer(HasTraits):
-    """ Execution tracer for Open Discovery kernel.
+    """ Execution tracer for Python.
     
     This class provides a user-friendly wrapper around the system trace 
     function (see `sys.settrace`). Its outputs (trace events) are consumed by
@@ -166,7 +166,7 @@ class Tracer(HasTraits):
         # Calls that can be picked up include:
         #   - Tracer.__exit__
         #   - Garbage collection callback from ObjectTracker
-        if module.startswith('opendisc.trace') and not 'tests' in module:
+        if module.startswith('flowgraph.trace') and not 'tests' in module:
             return False
         
         # By default, trace the function.

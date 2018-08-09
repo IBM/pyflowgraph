@@ -18,7 +18,7 @@ from collections import OrderedDict
 from pathlib2 import Path
 import unittest
 
-from opendisc.core.tests import objects
+from flowgraph.core.tests import objects
 from ..trace_event import TraceCall, TraceReturn
 from ..tracer import Tracer
 
@@ -29,7 +29,7 @@ class TestTracer(unittest.TestCase):
         """ Create the Tracer and a handler for TraceEvents.
         """
         self.tracer = Tracer()
-        self.tracer.modules = [ 'opendisc.trace.tests.test_tracer' ]
+        self.tracer.modules = [ 'flowgraph.trace.tests.test_tracer' ]
         
         self.events = []
         def handler(changed):

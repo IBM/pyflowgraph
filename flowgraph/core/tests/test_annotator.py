@@ -35,7 +35,7 @@ class TestAnnotator(unittest.TestCase):
         note = self.annotator.notate_function(objects.create_foo)
         self.assertEqual(note['id'], 'create-foo')
         self.assertEqual(note['language'], 'python')
-        self.assertEqual(note['package'], 'opendisc')
+        self.assertEqual(note['package'], 'flowgraph')
     
     def test_method_basic(self):
         """ Can we notate a method?
@@ -62,7 +62,7 @@ class TestAnnotator(unittest.TestCase):
         note = self.annotator.notate_object(objects.Foo())
         self.assertEqual(note['id'], 'foo')
         self.assertEqual(note['language'], 'python')
-        self.assertEqual(note['package'], 'opendisc')
+        self.assertEqual(note['package'], 'flowgraph')
         
         note = self.annotator.notate_type(objects.Foo)
         self.assertEqual(note['id'], 'foo')

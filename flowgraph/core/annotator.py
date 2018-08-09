@@ -23,7 +23,7 @@ from cachetools import cachedmethod
 from cachetools.keys import hashkey
 from traitlets import HasTraits, Dict, Instance
 
-from opendisc.trace.frame_util import get_class_module, get_class_full_name, \
+from flowgraph.trace.frame_util import get_class_module, get_class_full_name, \
     get_func_full_name
 from .annotation_db import AnnotationDB
 from .remote_annotation_db import RemoteAnnotationDB

@@ -50,8 +50,8 @@ def safe_execute(code, kc, **kwargs):
     return content
 
 
-class TestOpenDiscKernel(unittest.TestCase):
-    """ Tests the Open Discovery IPython kernel.
+class TestFlowGraphKernel(unittest.TestCase):
+    """ Tests the Flow Graph IPython kernel.
     """
     
     @classmethod
@@ -80,7 +80,7 @@ class TestOpenDiscKernel(unittest.TestCase):
         """
         code = dedent("""\
         %reset -f
-        from opendisc.core.tests.objects import Foo, Bar, Baz
+        from flowgraph.core.tests.objects import Foo, Bar, Baz
         """)
         with kernel() as kc:
             safe_execute(code, kc, silent=True)

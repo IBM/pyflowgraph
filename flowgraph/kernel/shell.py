@@ -18,8 +18,8 @@ from IPython.core.interactiveshell import InteractiveShellABC
 from ipykernel.zmqshell import ZMQInteractiveShell
 
 
-class OpenDiscIPythonShell(ZMQInteractiveShell):
-    """ InteractiveShell for use with OpenDiscIPythonKernel.
+class FlowGraphIPythonShell(ZMQInteractiveShell):
+    """ InteractiveShell for use with FlowGraphIPythonKernel.
     
     Not intended for standalone use.
     """
@@ -31,11 +31,11 @@ class OpenDiscIPythonShell(ZMQInteractiveShell):
         # that actually calls `exec()` on user code.
         if self.kernel._trace_flag:
             with self.kernel._tracer:
-                return super(OpenDiscIPythonShell, self).run_code(
+                return super(FlowGraphIPythonShell, self).run_code(
                     code_obj, result)
         else:
-            return super(OpenDiscIPythonShell, self).run_code(
+            return super(FlowGraphIPythonShell, self).run_code(
                 code_obj, result)
 
     
-InteractiveShellABC.register(OpenDiscIPythonShell)
+InteractiveShellABC.register(FlowGraphIPythonShell)

@@ -1,22 +1,22 @@
 [
   {
-    "_id": "annotation/python/opendisc/foo",
+    "_id": "annotation/python/flowgraph/foo",
     "schema": "annotation",
     "language": "python",
-    "package": "opendisc",
+    "package": "flowgraph",
     "id": "foo",
     "kind": "object",
-    "class": "opendisc.core.tests.objects.Foo",
+    "class": "flowgraph.core.tests.objects.Foo",
     "definition": "foo"
   },
   {
-    "_id": "annotation/python/opendisc/foo-slots",
+    "_id": "annotation/python/flowgraph/foo-slots",
     "schema": "annotation",
     "language": "python",
-    "package": "opendisc",
+    "package": "flowgraph",
     "id": "foo-slots",
     "kind": "object",
-    "class": "opendisc.core.tests.objects.FooSlots",
+    "class": "flowgraph.core.tests.objects.FooSlots",
     "definition": "foo",
     "slots": [
       {
@@ -34,46 +34,46 @@
     ]
   },
   {
-    "_id": "annotation/python/opendisc/bar",
+    "_id": "annotation/python/flowgraph/bar",
     "schema": "annotation",
     "language": "python",
-    "package": "opendisc",
+    "package": "flowgraph",
     "id": "bar",
     "kind": "object",
-    "class": "opendisc.core.tests.objects.Bar",
+    "class": "flowgraph.core.tests.objects.Bar",
     "definition": "bar"
   },
   {
-    "_id": "annotation/python/opendisc/bar-with-mixin",
+    "_id": "annotation/python/flowgraph/bar-with-mixin",
     "schema": "annotation",
     "language": "python",
-    "package": "opendisc",
+    "package": "flowgraph",
     "id": "bar-with-mixin",
     "kind": "object",
     "class": [
-      "opendisc.core.tests.objects.Bar",
-      "opendisc.core.tests.objects.BarMixin"
+      "flowgraph.core.tests.objects.Bar",
+      "flowgraph.core.tests.objects.BarMixin"
     ],
     "definition": "bar"
   },
   {
-    "_id": "annotation/python/opendisc/baz",
+    "_id": "annotation/python/flowgraph/baz",
     "schema": "annotation",
     "language": "python",
-    "package": "opendisc",
+    "package": "flowgraph",
     "id": "baz",
     "kind": "object",
-    "class": "opendisc.core.tests.objects.Baz",
+    "class": "flowgraph.core.tests.objects.Baz",
     "definition": "baz"
   },
   {
-    "_id": "annotation/python/opendisc/foo-container",
+    "_id": "annotation/python/flowgraph/foo-container",
     "schema": "annotation",
     "language": "python",
-    "package": "opendisc",
+    "package": "flowgraph",
     "id": "foo-container",
     "kind": "object",
-    "class": "opendisc.core.tests.objects.FooContainer",
+    "class": "flowgraph.core.tests.objects.FooContainer",
     "slots": [
       {
         "slot": "foo",
@@ -82,13 +82,13 @@
     ]
   },
   {
-    "_id": "annotation/python/opendisc/create-foo",
+    "_id": "annotation/python/flowgraph/create-foo",
     "schema": "annotation",
     "language": "python",
-    "package": "opendisc",
+    "package": "flowgraph",
     "id": "create-foo",
     "kind": "morphism",
-    "function": "opendisc.core.tests.objects.create_foo",
+    "function": "flowgraph.core.tests.objects.create_foo",
     "domain": [],
     "codomain": [
       {
@@ -98,13 +98,13 @@
     ]
   },
   {
-    "_id": "annotation/python/opendisc/bar-from-foo",
+    "_id": "annotation/python/flowgraph/bar-from-foo",
     "schema": "annotation",
     "language": "python",
-    "package": "opendisc",
+    "package": "flowgraph",
     "id": "bar-from-foo",
     "kind": "morphism",
-    "function": "opendisc.core.tests.objects.bar_from_foo",
+    "function": "flowgraph.core.tests.objects.bar_from_foo",
     "domain": [
       {
         "slot": 0,
@@ -126,13 +126,13 @@
     "definition": "bar-from-foo"
   },
   {
-    "_id": "annotation/python/opendisc/bar-from-foo-mutating",
+    "_id": "annotation/python/flowgraph/bar-from-foo-mutating",
     "schema": "annotation",
     "language": "python",
-    "package": "opendisc",
+    "package": "flowgraph",
     "id": "bar-from-foo-mutating",
     "kind": "morphism",
-    "function": "opendisc.core.tests.objects.bar_from_foo_mutating",
+    "function": "flowgraph.core.tests.objects.bar_from_foo_mutating",
     "domain": [
       {
         "slot": 0,
@@ -152,13 +152,13 @@
     "definition": "bar-from-foo"
   },
   {
-    "_id": "annotation/python/opendisc/foo-sum",
+    "_id": "annotation/python/flowgraph/foo-sum",
     "schema": "annotation",
     "language": "python",
-    "package": "opendisc",
+    "package": "flowgraph",
     "id": "foo-sum",
     "kind": "morphism",
-    "class": "opendisc.core.tests.objects.Foo",
+    "class": "flowgraph.core.tests.objects.Foo",
     "method": "do_sum",
     "domain": [
       {
@@ -174,13 +174,13 @@
     ]
   },
   {
-    "_id": "annotation/python/opendisc/foo-prod",
+    "_id": "annotation/python/flowgraph/foo-prod",
     "schema": "annotation",
     "language": "python",
-    "package": "opendisc",
+    "package": "flowgraph",
     "id": "foo-prod",
     "kind": "morphism",
-    "class": "opendisc.core.tests.objects.Foo",
+    "class": "flowgraph.core.tests.objects.Foo",
     "method": "do_prod",
     "domain": [
       {
@@ -196,13 +196,13 @@
     ]
   },
   {
-    "_id": "annotation/python/opendisc/bar-prod",
+    "_id": "annotation/python/flowgraph/bar-prod",
     "schema": "annotation",
     "language": "python",
-    "package": "opendisc",
+    "package": "flowgraph",
     "id": "bar-prod",
     "kind": "morphism",
-    "class": "opendisc.core.tests.objects.Bar",
+    "class": "flowgraph.core.tests.objects.Bar",
     "method": "do_prod",
     "domain": [
       {

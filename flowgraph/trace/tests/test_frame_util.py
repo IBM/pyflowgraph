@@ -18,7 +18,7 @@ import inspect
 import unittest
 import sys
 
-from opendisc.core.tests import objects
+from flowgraph.core.tests import objects
 from ..frame_util import *
 
 
@@ -79,7 +79,7 @@ class TestFrameUtil(unittest.TestCase):
         """ Can we get the name of this module from a frame?
         """
         self.assertEqual(get_frame_module(inspect.currentframe()),
-                         'opendisc.trace.tests.test_frame_util')
+                         'flowgraph.trace.tests.test_frame_util')
     
     def test_get_frame_func(self):
         """ Can we get the function object from a frame?

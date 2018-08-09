@@ -12,20 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ipykernel.kernelapp import IPKernelApp
-from traitlets import Type
+from __future__ import absolute_import
+
+from .kernelapp import FlowGraphIPKernelApp
 
 
-class OpenDiscIPKernelApp(IPKernelApp):
-    
-    name = 'opendisc-ipython-kernel'
-    
-    kernel_class = Type('opendisc.kernel.kernel.OpenDiscIPythonKernel',
-                        klass='ipykernel.kernelbase.Kernel')
-    
-    subcommands = {
-        'install': (
-            'opendisc.kernel.kernelspec.InstallIPythonKernelSpecApp',
-            'Install the Open Discovery IPython kernel'
-        ),
-    }
+if __name__ == '__main__':
+    FlowGraphIPKernelApp.launch_instance()

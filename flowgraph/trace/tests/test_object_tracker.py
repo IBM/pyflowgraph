@@ -17,7 +17,7 @@ from __future__ import absolute_import
 import gc
 import unittest
 
-from opendisc.core.tests import objects
+from flowgraph.core.tests import objects
 from ..object_tracker import ObjectTracker
 
 

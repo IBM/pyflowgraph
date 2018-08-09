@@ -1,9 +1,9 @@
 from setuptools import setup, find_packages
 
 setup_args = {
-    'name': 'opendisc',
+    'name': 'flowgraph',
     'version': '0.1',
-    'description': 'Open Discovery program analysis for Python',
+    'description': 'Flow graphs for Python',
     'license': 'ASL 2.0',
     'author': 'Evan Patterson',
     'author_email': 'epatters@stanford.edu',

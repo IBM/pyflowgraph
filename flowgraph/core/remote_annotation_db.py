@@ -20,7 +20,7 @@ import requests
 from traitlets import Bool, Dict, Instance, Unicode, default
 from traitlets.config import Configurable, PyFileConfigLoader
 
-import opendisc
+import flowgraph
 from .annotation_db import AnnotationDB
 
 
@@ -32,7 +32,7 @@ class RemoteAnnotationDB(AnnotationDB, Configurable):
     remote server.
     
     The class contains no Python-specific annotation logic. For that,
-    see `opendisc.kernel.trace.annotator`.
+    see `flowgraph.kernel.trace.annotator`.
     """
     
     # URL of REST API supplying the annotations.
@@ -47,7 +47,7 @@ class RemoteAnnotationDB(AnnotationDB, Configurable):
     def from_library_config(cls):
         """ Create annotation DB from library config file.
         """
-        config_path = Path(opendisc.__file__).parent.joinpath("config.py")
+        config_path = Path(flowgraph.__file__).parent.joinpath("config.py")
         config = PyFileConfigLoader(str(config_path)).load_config()
         return cls(config=config)
 

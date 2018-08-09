@@ -24,13 +24,13 @@ class TraceEvent(HasTraits):
     """
     
     # Tracer that created this event.
-    tracer = Instance('opendisc.trace.tracer.Tracer')
+    tracer = Instance('flowgraph.trace.tracer.Tracer')
     
     # The function object that was called.
     function = Any()
     
     # Name of module containing the definition of the called function.
-    # E.g., 'collections' or 'opendisc.userlib.data.read_data'.
+    # E.g., 'collections' or 'flowgraph.userlib.data.read_data'.
     module = Unicode()
     
     # Qualified name of the called function.

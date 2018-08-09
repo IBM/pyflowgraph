@@ -23,10 +23,10 @@ from ipykernel.jsonutil import json_clean
 import networkx as nx
 from traitlets import HasTraits, Bool, Dict, Instance, List, Unicode, default
 
-from opendisc.kernel.slots import get_slot
-from opendisc.trace.frame_util import get_class_module, get_class_qual_name
-from opendisc.trace.object_tracker import ObjectTracker
-from opendisc.trace.trace_event import TraceEvent, TraceCall, TraceReturn
+from flowgraph.kernel.slots import get_slot
+from flowgraph.trace.frame_util import get_class_module, get_class_qual_name
+from flowgraph.trace.object_tracker import ObjectTracker
+from flowgraph.trace.trace_event import TraceEvent, TraceCall, TraceReturn
 from .annotator import Annotator
 from .graphutil import node_name
 from .flow_graph import new_flow_graph

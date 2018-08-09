@@ -21,7 +21,7 @@ import unittest
 import networkx as nx
 import networkx.algorithms.isomorphism as iso
 
-from opendisc.trace.tracer import Tracer
+from flowgraph.trace.tracer import Tracer
 from ..annotation_db import AnnotationDB
 from ..flow_graph import new_flow_graph, flatten, join, \
     flow_graph_to_graphml, flow_graph_from_graphml
@@ -71,7 +71,7 @@ class TestFlowGraph(unittest.TestCase):
         self.builder = FlowGraphBuilder()
         self.builder.annotator.db = db
         self.tracer = Tracer()
-        self.tracer.modules = [ 'opendisc.core.tests.test_flow_graph' ]
+        self.tracer.modules = [ 'flowgraph.core.tests.test_flow_graph' ]
         self.id = self.tracer.object_tracker.get_id # For convenience
         
         def handler(changed):
@@ -371,9 +371,9 @@ class TestFlowGraph(unittest.TestCase):
         actual = graph.node[node]
         actual.pop('ports', None)
         desired = {
-            'module': 'opendisc.core.tests.objects',
+            'module': 'flowgraph.core.tests.objects',
             'qual_name': 'create_foo',
-            'annotation': 'python/opendisc/create-foo',
+            'annotation': 'python/flowgraph/create-foo',
             'annotation_kind': 'function',
         }
         self.assertEqual(actual, desired)
@@ -383,9 +383,9 @@ class TestFlowGraph(unittest.TestCase):
         actual = graph.node[node]
         actual.pop('ports', None)
         desired = {
-            'module': 'opendisc.core.tests.objects',
+            'module': 'flowgraph.core.tests.objects',
             'qual_name': 'bar_from_foo',
-            'annotation': 'python/opendisc/bar-from-foo',
+            'annotation': 'python/flowgraph/bar-from-foo',
             'annotation_kind': 'function',
         }
         self.assertEqual(actual, desired)
@@ -407,7 +407,7 @@ class TestFlowGraph(unittest.TestCase):
             'sourceport': '__return__',
             'targetport': 'foo',
             'id': self.id(foo),
-            'annotation': 'python/opendisc/foo',
+            'annotation': 'python/flowgraph/foo',
         }
         self.assertEqual(actual, desired)
         
@@ -415,7 +415,7 @@ class TestFlowGraph(unittest.TestCase):
         desired = {
             'sourceport': '__return__',
             'id': self.id(bar),
-            'annotation': 'python/opendisc/bar',
+            'annotation': 'python/flowgraph/bar',
         }
         self.assertEqual(actual, desired)
     
@@ -430,9 +430,9 @@ class TestFlowGraph(unittest.TestCase):
         actual = graph.node[node]
         actual.pop('ports', None)
         desired = {
-            'module': 'opendisc.core.tests.objects',
+            'module': 'flowgraph.core.tests.objects',
             'qual_name': 'Foo.__init__',
-            'annotation': 'python/opendisc/foo',
+            'annotation': 'python/flowgraph/foo',
             'annotation_kind': 'construct',
         }
         self.assertEqual(actual, desired)
@@ -451,9 +451,9 @@ class TestFlowGraph(unittest.TestCase):
             ('foo', {
                 'argname': 'foo',
                 'portkind': 'input',
-                'module': 'opendisc.core.tests.objects',
+                'module': 'flowgraph.core.tests.objects',
                 'qual_name': 'Foo',
-                'annotation': 'python/opendisc/foo',
+                'annotation': 'python/flowgraph/foo',
                 'annotation_index': 1,
                 'id': self.id(foo),
             }),
@@ -536,9 +536,9 @@ class TestFlowGraph(unittest.TestCase):
             ('__return__', {
                 'argname': '__return__',
                 'portkind': 'output',
-                'module': 'opendisc.core.tests.objects',
+                'module': 'flowgraph.core.tests.objects',
                 'qual_name': 'Foo',
-                'annotation': 'python/opendisc/foo',
+                'annotation': 'python/flowgraph/foo',
                 'annotation_index': 1,
                 'id': self.id(foo),
             })
@@ -559,18 +559,18 @@ class TestFlowGraph(unittest.TestCase):
             ('__return__', {
                 'argname': '__return__',
                 'portkind': 'output',
-                'module': 'opendisc.core.tests.objects',
+                'module': 'flowgraph.core.tests.objects',
                 'qual_name': 'Bar',
-                'annotation': 'python/opendisc/bar',
+                'annotation': 'python/flowgraph/bar',
                 'annotation_index': 2,
                 'id': self.id(bar),
             }),
             ('foo!', {
                 'argname': 'foo',
                 'portkind': 'output',
-                'module': 'opendisc.core.tests.objects',
+                'module': 'flowgraph.core.tests.objects',
                 'qual_name': 'Foo',
-                'annotation': 'python/opendisc/foo',
+                'annotation': 'python/flowgraph/foo',
                 'annotation_index': 1,
                 'id': self.id(foo),
             }),
@@ -597,17 +597,17 @@ class TestFlowGraph(unittest.TestCase):
             ('__return__.0', {
                 'argname': '__return__.0',
                 'portkind': 'output',
-                'module': 'opendisc.core.tests.objects',
+                'module': 'flowgraph.core.tests.objects',
                 'qual_name': 'Foo',
-                'annotation': 'python/opendisc/foo',
+                'annotation': 'python/flowgraph/foo',
                 'id': self.id(foo),
             }),
             ('__return__.1', {
                 'argname': '__return__.1',
                 'portkind': 'output',
-                'module': 'opendisc.core.tests.objects',
+                'module': 'flowgraph.core.tests.objects',
                 'qual_name': 'Bar',
-                'annotation': 'python/opendisc/bar',
+                'annotation': 'python/flowgraph/bar',
                 'id': self.id(bar),
             }),
         ])
@@ -653,7 +653,7 @@ class TestFlowGraph(unittest.TestCase):
         data = { k:v for k,v in graph.node[node].items()
                  if k.startswith('annotation') }
         self.assertEqual(data, {
-            'annotation': 'python/opendisc/foo-slots',
+            'annotation': 'python/flowgraph/foo-slots',
             'annotation_index': 1,
             'annotation_kind': 'slot',
         })
@@ -662,7 +662,7 @@ class TestFlowGraph(unittest.TestCase):
         data = { k:v for k,v in graph.node[node].items()
                  if k.startswith('annotation') }
         self.assertEqual(data, {
-            'annotation': 'python/opendisc/foo-slots',
+            'annotation': 'python/flowgraph/foo-slots',
             'annotation_index': 2,
             'annotation_kind': 'slot',
         })
@@ -694,9 +694,9 @@ class TestFlowGraph(unittest.TestCase):
         self.assertEqual(ports, OrderedDict([
             ('self', {
                 'portkind': 'input',
-                'module': 'opendisc.core.tests.objects',
+                'module': 'flowgraph.core.tests.objects',
                 'qual_name': 'FooSlots',
-                'annotation': 'python/opendisc/foo-slots',
+                'annotation': 'python/flowgraph/foo-slots',
                 'annotation_index': 1,
                 'id': self.id(foo),
             }),
@@ -829,11 +829,11 @@ class TestFlowGraph(unittest.TestCase):
         self.assertEqual(list(ports.values()), [
             {
                 'portkind': 'output',
-                'annotation': 'python/opendisc/foo',
+                'annotation': 'python/flowgraph/foo',
             },
             {
                 'portkind': 'output',
-                'annotation': 'python/opendisc/bar',
+                'annotation': 'python/flowgraph/bar',
             },
         ])
         self.assertEqual(outputs, { self.id(foo), self.id(bar) })
@@ -846,7 +846,7 @@ class TestFlowGraph(unittest.TestCase):
         self.assertEqual(list(ports.values()), [
             {
                 'portkind': 'output',
-                'annotation': 'python/opendisc/bar',
+                'annotation': 'python/flowgraph/bar',
             },
         ])
         self.assertEqual(outputs, { self.id(bar) })

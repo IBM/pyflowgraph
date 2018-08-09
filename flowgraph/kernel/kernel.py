@@ -25,11 +25,11 @@ from ..core.graphml import write_graphml_str
 from ..core.remote_annotation_db import RemoteAnnotationDB
 from ..trace.tracer import Tracer
 from .serialize import object_to_json
-from .shell import OpenDiscIPythonShell
+from .shell import FlowGraphIPythonShell
 from .slots import get_slots
 
 
-class OpenDiscIPythonKernel(IPythonKernel):
+class FlowGraphIPythonKernel(IPythonKernel):
     """ IPython kernel with support for program analysis and object inspection.
     """
     
@@ -45,14 +45,14 @@ class OpenDiscIPythonKernel(IPythonKernel):
     annotator = Instance(Annotator)
     
     # `IPythonKernel` traits.
-    shell_class = Type(OpenDiscIPythonShell)
+    shell_class = Type(FlowGraphIPythonShell)
     
     # Private traits.
     _builder = Instance(FlowGraphBuilder)
     _tracer = Instance(Tracer, args=())
     _trace_flag = Bool()
 
-    # `OpenDiscIPythonKernel` interface
+    # `FlowGraphIPythonKernel` interface
     
     def get_object(self, obj_id):
         """ Get a tracked object by ID.
@@ -72,7 +72,7 @@ class OpenDiscIPythonKernel(IPythonKernel):
         # Do execution, with tracing unless the execution request is `silent`.
         self._builder.reset()
         self._trace_flag = not silent
-        reply_content = super(OpenDiscIPythonKernel, self).do_execute(
+        reply_content = super(FlowGraphIPythonKernel, self).do_execute(
             code, silent, *args, **kwargs)
         
         # Add flow graph as a payload.
@@ -97,7 +97,7 @@ class OpenDiscIPythonKernel(IPythonKernel):
         """
         content = parent['content']
         if 'object_id' not in content:
-            return super(OpenDiscIPythonKernel, self).inspect_request(
+            return super(FlowGraphIPythonKernel, self).inspect_request(
                 stream, ident, parent)
 
         obj_id = content['object_id']

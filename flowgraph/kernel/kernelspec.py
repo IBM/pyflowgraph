@@ -25,17 +25,17 @@ from ipykernel.kernelspec import make_ipkernel_cmd, InstallIPythonKernelSpecApp
 def get_kernel_dict(extra_arguments=None):
     """ Construct dict for kernel.json.
     """
-    mod = 'opendisc.kernel'
+    mod = 'flowgraph.kernel'
     return {
         'argv': make_ipkernel_cmd(mod, extra_arguments=extra_arguments),
-        'display_name': 'Python %i [Open Discovery]' % sys.version_info[0],
+        'display_name': 'Python %i [flowgraph]' % sys.version_info[0],
         'language': 'python',
     }
 
 def get_kernel_name():
     """ Get the (default) name for the kernel.
     """
-    return 'opendisc_python%i' % sys.version_info[0]
+    return 'flowgraph_python%i' % sys.version_info[0]
 
 
 def main():
