@@ -162,7 +162,7 @@ class FlowGraphBuilder(HasTraits):
         nested = None
         if not event.atomic:
             nested = new_flow_graph()
-            graph.node[node]['graph'] = nested
+            graph.nodes[node]['graph'] = nested
     
         # Push call context onto stack.
         self._stack.append(_CallContext(event=event, node=node, graph=nested))
@@ -227,7 +227,7 @@ class FlowGraphBuilder(HasTraits):
                 'annotation': self._annotation_key(annotation),
                 'annotation_kind': 'function',
             })
-        graph.add_node(node, attr_dict=data)
+        graph.add_node(node, **data)
         return node
     
     def _update_call_node_for_return(self, event, annotation, node):
@@ -235,7 +235,7 @@ class FlowGraphBuilder(HasTraits):
         """
         context = self._stack[-1]
         graph = context.graph
-        data = graph.node[node]
+        data = graph.nodes[node]
         
         # Handle special methods (unless overriden by annotation).
         if event.name in ('__getattr__', '__getattribute__'):
@@ -279,7 +279,7 @@ class FlowGraphBuilder(HasTraits):
         """ Update a `__getattr__` call node for a return event.
         """
         context = self._stack[-1]
-        data = context.graph.node[node]
+        data = context.graph.nodes[node]
         
         args = list(event.arguments.values())
         obj, name = args[0], args[1]
@@ -301,7 +301,7 @@ class FlowGraphBuilder(HasTraits):
         """ Update an `__init__` call node for a return event.
         """
         context = self._stack[-1]
-        data = context.graph.node[node]
+        data = context.graph.nodes[node]
         
         obj = list(event.arguments.values())[0]
         note = self.annotator.notate_object(obj)
@@ -354,7 +354,7 @@ class FlowGraphBuilder(HasTraits):
             data['sourceport'] = sourceport
         if targetport is not None:
             data['targetport'] = targetport
-        graph.add_edge(source, target, attr_dict=data)
+        graph.add_edge(source, target, **data)
     
     def _add_object_input_node(self, obj, obj_id, node, port):
         """ Add an object as an unknown input to a node.
@@ -384,7 +384,8 @@ class FlowGraphBuilder(HasTraits):
         # Remove old output, if any.
         if obj_id in output_table:
             old, _ = output_table[obj_id]
-            keys = [ key for key, data in graph.edge[old][output_node].items()
+            edge_data = graph.get_edge_data(old, output_node)
+            keys = [ key for key, data in edge_data.items()
                      if data['id'] == obj_id ]
             assert len(keys) == 1
             graph.remove_edge(old, output_node, key=keys[0])
@@ -426,7 +427,7 @@ class FlowGraphBuilder(HasTraits):
                     )),
                 ])
             }
-            graph.add_node(slot_node, attr_dict=slot_node_data)
+            graph.add_node(slot_node, **slot_node_data)
             self._add_object_edge(obj, obj_id, node, slot_node,
                                   sourceport=port, targetport='self')
             

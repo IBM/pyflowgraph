@@ -17,7 +17,7 @@ setup_args = {
         'traitlets',
         'requests',
         'jsonpickle',
-        'networkx==1.11',
+        'networkx>=2.0',
         'cachetools>=2.0.0',
         'blitzdb>=0.3',
         'sqlalchemy',

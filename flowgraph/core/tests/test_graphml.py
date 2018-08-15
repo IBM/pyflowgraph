@@ -42,8 +42,8 @@ class TestGraphMLIO(unittest.TestCase):
             graph.graph.pop('edge_default', None)
         
         self.assertEqual(one.graph, two.graph)
-        self.assertEqual(one.node, two.node)
-        self.assertEqual(one.edge, two.edge)
+        self.assertEqual(one.nodes, two.nodes)
+        self.assertEqual(one.edges, two.edges)
 
     def test_basic_graph(self):
         """ Can we round-trip a basic directed graph?
@@ -90,17 +90,17 @@ class TestGraphMLIO(unittest.TestCase):
         foo_graph.add_node('foo1', kind='foo')
         foo_graph.add_node('foo2', kind='foo')
         foo_graph.add_edge('foo1', 'foo2')
-        graph.node['foo-container']['graph'] = foo_graph
+        graph.nodes['foo-container']['graph'] = foo_graph
         
         bar_graph = nx.DiGraph()
         bar_graph.add_node('bar1', kind='bar')
         bar_graph.add_node('bar2', kind='bar')
         bar_graph.add_edge('bar1', 'bar2')
-        graph.node['bar-container']['graph'] = bar_graph
+        graph.nodes['bar-container']['graph'] = bar_graph
         
         recovered = roundtrip(graph)
-        foo_recovered = recovered.node['foo-container']['graph']
-        bar_recovered = recovered.node['bar-container']['graph']
+        foo_recovered = recovered.nodes['foo-container']['graph']
+        bar_recovered = recovered.nodes['bar-container']['graph']
         self.assert_graphs_equal(foo_recovered, foo_graph)
         self.assert_graphs_equal(bar_recovered, bar_graph)
     
@@ -111,10 +111,10 @@ class TestGraphMLIO(unittest.TestCase):
         graph.add_node('root')
         nested = nx.DiGraph(node='__node__')
         nested.add_path(['__node__', 'n1', 'n2', '__node__'])
-        graph.node['root']['graph'] = nested
+        graph.nodes['root']['graph'] = nested
 
         recovered = roundtrip(graph)
-        nested_recovered = recovered.node['root']['graph']
+        nested_recovered = recovered.nodes['root']['graph']
         self.assert_graphs_equal(nested_recovered, nested)
         
         # The reference node ID should only appear as a graph attribute.
@@ -128,10 +128,10 @@ class TestGraphMLIO(unittest.TestCase):
         graph.add_node('root')
         nested = nx.DiGraph(input_node='__in__', output_node='__out__')
         nested.add_path(['__in__', 'n1', 'n2', '__out__'])
-        graph.node['root']['graph'] = nested
+        graph.nodes['root']['graph'] = nested
 
         recovered = roundtrip(graph)
-        nested_recovered = recovered.node['root']['graph']
+        nested_recovered = recovered.nodes['root']['graph']
         self.assert_graphs_equal(nested_recovered, nested)
         
         # The reference node IDs should only appear as graph attributes.
