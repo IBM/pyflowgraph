@@ -169,5 +169,17 @@ class Tracer(HasTraits):
         if module.startswith('flowgraph.trace') and not 'tests' in module:
             return False
         
+        # The final test is an explicit blacklist of functions to ignore. 
+        if qual_name in trace_blacklist:
+            return False
+        
         # By default, trace the function.
         return True
+
+
+trace_blacklist = set([
+    # Python 2 only: extensions of import system due to `pkg_resources` and
+    # `six` packages.
+    '_SixMetaPathImporter.find_module',
+    'VendorImporter.find_module',
+])
