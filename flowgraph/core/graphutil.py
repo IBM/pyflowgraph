@@ -30,8 +30,8 @@ def find_node(graph, query, **kwargs):
 def find_nodes(graph, query, data=False):
     """ Iterator over all nodes matching the data query.
     """
-    return ((v, graph.node[v]) if data else v 
-            for v in graph if query(graph.node[v]))
+    return ((v, graph.nodes[v]) if data else v 
+            for v in graph if query(graph.nodes[v]))
 
 
 def node_name(graph, base=None, sep=None):

@@ -140,7 +140,7 @@ class GraphMLWriter(BaseGraphMLWriter):
     def add_nodes(self, graph, graph_element, parent_node=None):
         """ Reimplemented to support nested graphs.
         """
-        for node, data in graph.nodes_iter(data=True):
+        for node, data in graph.nodes(data=True):
             # If the node is a reference to the parent graph, skip it.
             # It has already been added.
             if self.is_parent_reference(graph, node):
@@ -186,11 +186,11 @@ class GraphMLWriter(BaseGraphMLWriter):
         """ Reimplemented to support ports.
         
         Unlike the base class, we do not store edge keys as data (or at all).
-        Cf. this PR for unreleased NetworkX 2.0:
+        Cf. this PR for NetworkX 2.0:
         https://github.com/networkx/networkx/pull/2559
         """
         default = graph.graph.get('edge_default', {})
-        for u,v,data in graph.edges_iter(data=True):
+        for u,v,data in graph.edges(data=True):
             source = parent_node if self.is_parent_reference(graph, u) else u
             target = parent_node if self.is_parent_reference(graph, v) else v
             edge_element = Element('edge',
@@ -335,7 +335,7 @@ class GraphMLReader(BaseGraphMLReader):
         elif len(nested_xml) > 1:
             raise nx.NetworkXError("GraphML allows at most one nested graph per node")
         
-        graph.add_node(node_id, data)
+        graph.add_node(node_id, **data)
     
     def add_edge(self, graph, edge_element, graphml_keys, parent_node):
         """ Reimplemented to handle nested graphs and ports.
@@ -372,4 +372,4 @@ class GraphMLReader(BaseGraphMLReader):
         if targetport is not None:
             data['targetport'] = targetport
         
-        graph.add_edge(source, target, attr_dict=data)
+        graph.add_edge(source, target, **data)

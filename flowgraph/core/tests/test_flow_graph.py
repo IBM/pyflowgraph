@@ -54,7 +54,7 @@ class TestFlowGraph(unittest.TestCase):
     def get_ports(self, graph, node, portkind=None):
         """ Convenience method to get ports from node in flow graph.
         """
-        ports = graph.node[node]['ports']
+        ports = graph.nodes[node]['ports']
         if portkind is not None:
             ports = OrderedDict((p, data) for p, data in ports.items()
                                 if data['portkind'] == portkind)
@@ -193,7 +193,6 @@ class TestFlowGraph(unittest.TestCase):
         outputs = target.graph['output_node']
         target.add_node('1', qual_name='Bar.make_bar')
         target.add_edge('1', outputs, id=self.id(bar), sourceport='__return__')
-        print(actual.edges())
         self.assert_isomorphic(actual, target)
     
     def test_singly_nested(self):
@@ -210,7 +209,7 @@ class TestFlowGraph(unittest.TestCase):
         self.assert_isomorphic(actual, target)
         
         node = find_node(actual, lambda n: n.get('qual_name') == 'outer_bar')
-        actual_sub = actual.node[node]['graph']
+        actual_sub = actual.nodes[node]['graph']
         target_sub = new_flow_graph()
         outputs = target_sub.graph['output_node']
         target_sub.add_node('1', qual_name='Foo.__init__')
@@ -254,7 +253,7 @@ class TestFlowGraph(unittest.TestCase):
         self.assert_isomorphic(actual, target)
         
         node = find_node(actual, lambda n: n.get('qual_name') == 'outer_bar_from_foo')
-        actual_sub1 = actual.node[node]['graph']
+        actual_sub1 = actual.nodes[node]['graph']
         target_sub1 = new_flow_graph()
         inputs = target_sub1.graph['input_node']
         outputs = target_sub1.graph['output_node']
@@ -264,7 +263,7 @@ class TestFlowGraph(unittest.TestCase):
         self.assert_isomorphic(actual_sub1, target_sub1)
         
         node = find_node(actual_sub1, lambda n: n.get('qual_name') == 'inner_bar_from_foo')
-        actual_sub2 = actual_sub1.node[node]['graph']
+        actual_sub2 = actual_sub1.nodes[node]['graph']
         target_sub2 = new_flow_graph()
         inputs = target_sub2.graph['input_node']
         outputs = target_sub2.graph['output_node']
@@ -368,7 +367,7 @@ class TestFlowGraph(unittest.TestCase):
         
         graph = self.builder.graph
         node = find_node(graph, lambda n: n.get('qual_name') == 'create_foo')
-        actual = graph.node[node]
+        actual = graph.nodes[node]
         actual.pop('ports', None)
         desired = {
             'module': 'flowgraph.core.tests.objects',
@@ -379,8 +378,8 @@ class TestFlowGraph(unittest.TestCase):
         self.assertEqual(actual, desired)
         
         node = find_node(graph, lambda n: n.get('qual_name') == 'bar_from_foo')
-        note = graph.node[node]['annotation']
-        actual = graph.node[node]
+        note = graph.nodes[node]['annotation']
+        actual = graph.nodes[node]
         actual.pop('ports', None)
         desired = {
             'module': 'flowgraph.core.tests.objects',
@@ -402,7 +401,7 @@ class TestFlowGraph(unittest.TestCase):
         foo_node = find_node(graph, lambda n: n.get('qual_name') == 'create_foo')
         bar_node = find_node(graph, lambda n: n.get('qual_name') == 'bar_from_foo')
         
-        actual = graph.edge[foo_node][bar_node][0]
+        actual = graph.edges[foo_node, bar_node, 0]
         desired = {
             'sourceport': '__return__',
             'targetport': 'foo',
@@ -411,7 +410,7 @@ class TestFlowGraph(unittest.TestCase):
         }
         self.assertEqual(actual, desired)
         
-        actual = graph.edge[bar_node][output_node][0]
+        actual = graph.edges[bar_node, output_node, 0]
         desired = {
             'sourceport': '__return__',
             'id': self.id(bar),
@@ -427,7 +426,7 @@ class TestFlowGraph(unittest.TestCase):
         
         graph = self.builder.graph
         node = find_node(graph, lambda n: n.get('qual_name') == 'Foo.__init__')
-        actual = graph.node[node]
+        actual = graph.nodes[node]
         actual.pop('ports', None)
         desired = {
             'module': 'flowgraph.core.tests.objects',
@@ -650,7 +649,7 @@ class TestFlowGraph(unittest.TestCase):
         self.assert_isomorphic(actual, target)
         
         node = find_node(graph, lambda n: n.get('slot') == 'x')
-        data = { k:v for k,v in graph.node[node].items()
+        data = { k:v for k,v in graph.nodes[node].items()
                  if k.startswith('annotation') }
         self.assertEqual(data, {
             'annotation': 'python/flowgraph/foo-slots',
@@ -659,7 +658,7 @@ class TestFlowGraph(unittest.TestCase):
         })
         
         node = find_node(graph, lambda n: n.get('slot') == 'y')
-        data = { k:v for k,v in graph.node[node].items()
+        data = { k:v for k,v in graph.nodes[node].items()
                  if k.startswith('annotation') }
         self.assertEqual(data, {
             'annotation': 'python/flowgraph/foo-slots',
@@ -690,7 +689,7 @@ class TestFlowGraph(unittest.TestCase):
         self.assert_isomorphic(actual, target)
         
         node = find_node(graph, lambda n: n.get('slot') == 'do_sum')
-        ports = graph.node[node]['ports']
+        ports = graph.nodes[node]['ports']
         self.assertEqual(ports, OrderedDict([
             ('self', {
                 'portkind': 'input',
@@ -811,8 +810,8 @@ class TestFlowGraph(unittest.TestCase):
         xml = write_graphml_str(flow_graph_to_graphml(graph))
         recovered = flow_graph_from_graphml(read_graphml_str(xml, multigraph=True))
         self.assertEqual(graph.graph, recovered.graph)
-        self.assertEqual(graph.node, recovered.node)
-        self.assertEqual(graph.edge, recovered.edge)
+        self.assertEqual(graph.nodes, recovered.nodes)
+        self.assertEqual(graph.edges, recovered.edges)
     
     def test_graphml_output_ports(self):
         """ Does a GraphML-serialized flow graph have correct output ports?
@@ -822,10 +821,10 @@ class TestFlowGraph(unittest.TestCase):
             bar = objects.bar_from_foo(foo)
         
         outer = flow_graph_to_graphml(self.builder.graph)
-        root = outer.nodes()[0]
-        graph, ports = outer.node[root]['graph'], outer.node[root]['ports']
+        root = list(outer.nodes)[0]
+        graph, ports = outer.nodes[root]['graph'], outer.nodes[root]['ports']
         outputs = { data['id'] for _, _, data in
-                    graph.in_edges_iter(graph.graph['output_node'], data=True) }
+                    graph.in_edges(graph.graph['output_node'], data=True) }
         self.assertEqual(list(ports.values()), [
             {
                 'portkind': 'output',
@@ -839,10 +838,10 @@ class TestFlowGraph(unittest.TestCase):
         self.assertEqual(outputs, { self.id(foo), self.id(bar) })
         
         outer = flow_graph_to_graphml(self.builder.graph, simplify_outputs=True)
-        root = outer.nodes()[0]
-        graph, ports = outer.node[root]['graph'], outer.node[root]['ports']
+        root = list(outer.nodes)[0]
+        graph, ports = outer.nodes[root]['graph'], outer.nodes[root]['ports']
         outputs = { data['id'] for _, _, data in
-                    graph.in_edges_iter(graph.graph['output_node'], data=True) }
+                    graph.in_edges(graph.graph['output_node'], data=True) }
         self.assertEqual(list(ports.values()), [
             {
                 'portkind': 'output',
