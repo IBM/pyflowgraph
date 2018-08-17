@@ -24,7 +24,7 @@ import types
 def get_class_module(typ):
     """ Get name of module in which type was defined.
     """
-    return _apply_spec(typ.__module__)
+    return _fix_module_name(typ.__module__)
 
 def get_class_qual_name(typ):
     """ Get qualified name of class.
@@ -50,7 +50,7 @@ def get_class_full_name(typ):
 def get_func_module(func):
     """ Get name of module in which the function object was defined.
     """
-    return _apply_spec(func.__module__)
+    return _fix_module_name(func.__module__)
 
 def get_func_qual_name(func):
     """ Get the qualified name of a function object.
@@ -98,7 +98,7 @@ def get_frame_module(frame):
     except KeyError:
         # Some frames, e.g. calls of IPython magics, belong to no module.
         name = None
-    return _apply_spec(name)
+    return _fix_module_name(name)
 
 def get_frame_func(frame, raise_on_ambiguous=True):
     """ Get the function/method object of the called function in a frame.
@@ -151,13 +151,18 @@ def get_frame_arguments(frame):
     return args
 
 
-def _apply_spec(name):
-    """ Hack to replace __main__ with correct module name.
-    
-    See PEP 451: "A ModuleSpec Type for the Import System"
+def _fix_module_name(name):
+    """ Fix up name of Python module.
     """
+    # Python 2 only: use 'builtins' for consistency with Python 3.
+    if name == '__builtin__':
+        name = 'builtins'
+    
+    # Hack to replace __main__ with correct module name.
+    # See PEP 451: "A ModuleSpec Type for the Import System"
     if name == '__main__':
         spec = getattr(sys.modules['__main__'], '__spec__', None)
         if spec is not None:
             name = spec.name
+
     return name

@@ -823,9 +823,12 @@ class TestFlowGraph(unittest.TestCase):
         outer = flow_graph_to_graphml(self.builder.graph)
         root = list(outer.nodes)[0]
         graph, ports = outer.nodes[root]['graph'], outer.nodes[root]['ports']
+        # FIXME: Outputs ports should have a deterministic order.
+        sorted_ports = sorted(ports.values(),
+                              key=lambda d: d['annotation'], reverse=True)
         outputs = { data['id'] for _, _, data in
                     graph.in_edges(graph.graph['output_node'], data=True) }
-        self.assertEqual(list(ports.values()), [
+        self.assertEqual(sorted_ports, [
             {
                 'portkind': 'output',
                 'annotation': 'python/flowgraph/foo',

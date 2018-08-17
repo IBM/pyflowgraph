@@ -16,6 +16,7 @@ from __future__ import absolute_import
 
 import os
 from pathlib2 import Path
+import six
 import unittest
 
 import networkx as nx
@@ -135,6 +136,7 @@ class IntegrationTestFlowGraph(unittest.TestCase):
                         sourceport='__return__', targetport='data')
         self.assert_isomorphic(graph, target)
     
+    @unittest.skipUnless(six.PY3, "pd.read_csv needs Py2-compatible annotation")
     def test_sklearn_clustering_kmeans(self):
         """ K-means clustering on the Iris dataset using sklearn.
         """
@@ -181,7 +183,9 @@ class IntegrationTestFlowGraph(unittest.TestCase):
                         annotation='python/sklearn/fit-predict-clustering')
         target.add_node('agglom', qual_name='AgglomerativeClustering.__init__',
                         annotation='python/sklearn/agglomerative')
-        target.add_node('fit_agglom', qual_name='ClusterMixin.fit_predict',
+        target.add_node('fit_agglom',
+                        qual_name=('ClusterMixin' if six.PY3 else
+                            'AgglomerativeClustering') + '.fit_predict',
                         annotation='python/sklearn/fit-predict-clustering')
         target.add_node('score', qual_name='mutual_info_score')
         target.add_edge('kmeans', 'fit_kmeans',
@@ -204,6 +208,7 @@ class IntegrationTestFlowGraph(unittest.TestCase):
                         annotation='python/numpy/ndarray')
         self.assert_isomorphic(graph, target)
     
+    @unittest.skipUnless(six.PY3, "pd.read_csv needs Py2-compatible annotation")
     def test_sklearn_regression_metrics(self):
         """ Errors metrics for linear regression using sklearn.
         """
@@ -260,9 +265,11 @@ class IntegrationTestFlowGraph(unittest.TestCase):
                         annotation='python/statsmodels/get-r-dataset')
         target.add_node('read-get', qual_name='Dataset.__getattribute__',
                         annotation='python/statsmodels/dataset', slot='data')
-        target.add_node('ols', qual_name='Model.from_formula',
+        target.add_node('ols',
+                        qual_name=('Model' if six.PY3 else 'OLS') + '.from_formula',
                         annotation='python/statsmodels/ols-from-formula')
-        target.add_node('fit', qual_name='RegressionModel.fit',
+        target.add_node('fit',
+                        qual_name=('RegressionModel' if six.PY3 else 'OLS') + '.fit',
                         annotation='python/statsmodels/fit')
         target.add_edge('read', 'read-get',
                         sourceport='__return__', targetport='self',
