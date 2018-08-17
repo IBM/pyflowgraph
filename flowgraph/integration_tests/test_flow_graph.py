@@ -255,6 +255,7 @@ class IntegrationTestFlowGraph(unittest.TestCase):
                         annotation='python/numpy/ndarray')
         self.assert_isomorphic(graph, target)
     
+    @unittest.skipIf('CI' in os.environ, "needs to download R dataset")
     def test_statsmodel_regression(self):
         """ Linear regression on an R dataset using statsmodels.
         """
