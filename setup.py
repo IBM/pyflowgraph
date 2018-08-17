@@ -11,7 +11,6 @@ setup_args = {
     'packages': find_packages(),
     'zip_safe': False,
     'install_requires': [
-        # core package
         'pathlib2',
         'six',
         'traitlets',
@@ -23,13 +22,15 @@ setup_args = {
         'sqlalchemy',
         'ipykernel>=4.3.0',
     ],
-    'tests_require': [
-        # integration tests
-        'pandas',
-        'scipy',
-        'sklearn',
-        'statsmodels',
-    ],
+    'extras_require': {
+        'integration_tests': [
+            'numpy',
+            'scipy',
+            'pandas',
+            'sklearn',
+            'statsmodels',
+        ]
+    },
 }
 
 setup(**setup_args)

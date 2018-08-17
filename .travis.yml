@@ -1,0 +1,11 @@
+# Python for Travis: https://docs.travis-ci.com/user/languages/python/
+
+language: python
+python:
+  - "2.7"
+  - "3.6"
+install:
+  - pip install .[integration_tests]
+  - python -m flowgraph.kernel.kernelspec --user
+script:
+  - nosetests
