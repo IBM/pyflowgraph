@@ -25,11 +25,11 @@ import networkx.algorithms.isomorphism as iso
 from ..core.flow_graph import new_flow_graph, flow_graph_to_graphml
 from ..core.flow_graph_builder import FlowGraphBuilder
 from ..core.graphml import write_graphml
+from ..core.record import record_script
 from ..core.remote_annotation_db import RemoteAnnotationDB
 from ..trace.tracer import Tracer
 
 data_path = Path(__file__).parent.joinpath('data')
-test_module_name = 'integration_test_flow_graph'
 
 
 class IntegrationTestFlowGraph(unittest.TestCase):
@@ -40,22 +40,9 @@ class IntegrationTestFlowGraph(unittest.TestCase):
     
     @classmethod
     def setUpClass(cls):
-        """ Set up the tracer and flow graph builder.
+        """ Set up the annotation database.
         """
-        cls.tracer = Tracer(modules=[test_module_name])
-        cls.builder = FlowGraphBuilder(store_slots=False)
-        cls.builder.annotator.db = RemoteAnnotationDB.from_library_config()
-        
-        def handler(changed):
-            event = changed['new']
-            if event:
-                cls.builder.push_event(event)
-        cls.tracer.observe(handler, 'event')
-    
-    def setUp(self):
-        """ Reset the flow graph builder.
-        """
-        self.builder.reset()
+        cls.db = RemoteAnnotationDB.from_library_config()
     
     def assert_isomorphic(self, actual, target):
         """ Assert that two flow graphs are isomorphic.
@@ -71,27 +58,15 @@ class IntegrationTestFlowGraph(unittest.TestCase):
         self.assertTrue(matcher.is_isomorphic())
         return matcher.mapping
     
-    def trace_script(self, name, env=None, save=True):
-        """ Execute and trace a test script.
+    def record_script(self, name, env=None, save=True):
+        """ Execute and record a test script.
         """
-        # Read and compile the script.
+        # Record the script.
         filename = str(data_path.joinpath(name + '.py'))
-        with open(filename) as f:
-            code = compile(f.read(), filename, 'exec')
-        
-        # Run the script with the right working directory and module name.
-        cwd = os.getcwd()
-        env = env or {}
-        env['__name__'] = test_module_name
-        try:
-            os.chdir(str(data_path))
-            with self.tracer:
-                exec(code, env)
-        finally:
-            os.chdir(cwd)
+        graph = record_script(filename, env=env, cwd=str(data_path), db=self.db,
+                              store_slots=False)
         
         # Save the graph as GraphML for consumption by downstream tests.
-        graph = self.builder.graph
         if save:
             outname = str(data_path.joinpath(name + '.xml'))
             graphml = flow_graph_to_graphml(graph, simplify_outputs=True)
@@ -102,7 +77,7 @@ class IntegrationTestFlowGraph(unittest.TestCase):
     def test_pandas_read_sql(self):
         """ Read SQL table using pandas and SQLAlchemy.
         """
-        graph = self.trace_script("pandas_read_sql")
+        graph = self.record_script("pandas_read_sql")
         target = new_flow_graph()
         outputs = target.graph['output_node']
         target.add_node('create_engine', qual_name='create_engine')
@@ -120,7 +95,7 @@ class IntegrationTestFlowGraph(unittest.TestCase):
     def test_scipy_clustering_kmeans(self):
         """ K-means clustering on the Iris data using NumPy and SciPy.
         """
-        graph = self.trace_script("scipy_clustering_kmeans")
+        graph = self.record_script("scipy_clustering_kmeans")
         graph.remove_node(graph.graph['output_node'])
 
         target = new_flow_graph()
@@ -140,7 +115,7 @@ class IntegrationTestFlowGraph(unittest.TestCase):
     def test_sklearn_clustering_kmeans(self):
         """ K-means clustering on the Iris dataset using sklearn.
         """
-        graph = self.trace_script("sklearn_clustering_kmeans")
+        graph = self.record_script("sklearn_clustering_kmeans")
         graph.remove_node(graph.graph['output_node'])
         
         target = new_flow_graph()
@@ -171,7 +146,7 @@ class IntegrationTestFlowGraph(unittest.TestCase):
     def test_sklearn_clustering_metric(self):
         """ Compare sklearn clustering models using a cluster similarity metric.
         """
-        graph = self.trace_script("sklearn_clustering_metrics")
+        graph = self.record_script("sklearn_clustering_metrics")
         graph.remove_node(graph.graph['output_node'])
         
         target = new_flow_graph()
@@ -212,7 +187,7 @@ class IntegrationTestFlowGraph(unittest.TestCase):
     def test_sklearn_regression_metrics(self):
         """ Errors metrics for linear regression using sklearn.
         """
-        graph = self.trace_script("sklearn_regression_metrics")
+        graph = self.record_script("sklearn_regression_metrics")
         graph.remove_node(graph.graph['output_node'])
         
         target = new_flow_graph()
@@ -259,7 +234,7 @@ class IntegrationTestFlowGraph(unittest.TestCase):
     def test_statsmodel_regression(self):
         """ Linear regression on an R dataset using statsmodels.
         """
-        graph = self.trace_script("statsmodels_regression")
+        graph = self.record_script("statsmodels_regression")
         target = new_flow_graph()
         outputs = target.graph['output_node']
         target.add_node('read', qual_name='get_rdataset',

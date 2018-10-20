@@ -19,10 +19,73 @@ the `FlowGraphBuilder` and `Tracer` into easy-to-use functions.
 """
 from __future__ import absolute_import
 
+import os
+
 from traitlets import HasTraits, Instance
 
 from flowgraph.trace.tracer import Tracer
 from .flow_graph_builder import FlowGraphBuilder
+from .remote_annotation_db import RemoteAnnotationDB
+
+
+def record_code(code, env=None, cwd=None, db=None, **kwargs):
+    """ Evaluate and record Python code.
+
+    Parameters
+    ----------
+    code : str or code object
+        Python code to record
+    
+    env : dict (optional)
+        Environment in which to evaluate code
+
+    cwd : str (optional)
+        Current working directory in which to evaluate code
+    
+    db : AnnotatioDB (optional)
+        Annotation database, by default the standard remoate annotation DB
+
+    **kwargs
+        Extra arguments to pass to `FlowGraphBuilder`.
+    """
+    db = db or RemoteAnnotationDB.from_library_config()
+    builder = FlowGraphBuilder(**kwargs)
+    builder.annotator.db = db
+    tracer = Tracer(modules=['__record__'])
+
+    # Evaluate the code with the right working directory, environment, and
+    # module name.
+    env = env or {}
+    env['__name__'] = '__record__'
+    if cwd is not None:
+        oldcwd = os.getcwd()
+        os.chdir(cwd)
+    try:
+        with Recorder(builder=builder, tracer=tracer) as graph:
+            exec(code, env)
+    finally:
+        if cwd is not None:
+            os.chdir(oldcwd)
+
+    return graph
+
+
+def record_script(filename, **kwargs):
+    """ Evaluate and record Python script.
+
+    Parameters
+    ----------
+    filename : str
+        Filename of Python script to evaluate
+    
+    **kwargs
+        Extra arguments to pass to `record_code`.
+    """
+    # Read and compile the script.
+    with open(filename) as f:
+        code = compile(f.read(), filename, 'exec')
+    
+    return record_code(code, **kwargs)
 
 
 class Recorder(HasTraits):
