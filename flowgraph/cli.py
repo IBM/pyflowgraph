@@ -21,8 +21,6 @@ import sys
 
 import click
 
-from .core.flow_graph import flow_graph_to_graphml
-from .core.graphml import write_graphml
 from .core.record import record_code
 
 
@@ -31,7 +29,5 @@ from .core.record import record_code
 @click.option('-o', '--out', type=click.File('wb'))
 def cli(script, out):
     code = script.read()
-    graph = record_code(code)
-
     out = out or (sys.stdout.buffer if six.PY3 else sys.stdout)
-    write_graphml(flow_graph_to_graphml(graph), out)
+    graph = record_code(code, out=out)

@@ -24,17 +24,22 @@ import os
 from traitlets import HasTraits, Instance
 
 from flowgraph.trace.tracer import Tracer
+from .flow_graph import flow_graph_to_graphml
 from .flow_graph_builder import FlowGraphBuilder
+from .graphml import write_graphml
 from .remote_annotation_db import RemoteAnnotationDB
 
 
-def record_code(code, env=None, cwd=None, db=None, **kwargs):
+def record_code(code, out=None, env=None, cwd=None, db=None, **kwargs):
     """ Evaluate and record Python code.
 
     Parameters
     ----------
     code : str or code object
         Python code to record
+    
+    out : str or file-like object (optional)
+        Filename or file to which recorded flow graph is written (as GraphML)
     
     env : dict (optional)
         Environment in which to evaluate code
@@ -66,12 +71,15 @@ def record_code(code, env=None, cwd=None, db=None, **kwargs):
     finally:
         if cwd is not None:
             os.chdir(oldcwd)
+    
+    if out is not None:
+        write_graphml(flow_graph_to_graphml(graph), out)
 
     return graph
 
 
 def record_script(filename, **kwargs):
-    """ Evaluate and record Python script.
+    """ Evaluate and record a Python script.
 
     Parameters
     ----------
