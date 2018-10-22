@@ -47,7 +47,7 @@ def record_code(code, out=None, env=None, cwd=None, db=None, **kwargs):
     cwd : str (optional)
         Current working directory in which to evaluate code
     
-    db : AnnotatioDB (optional)
+    db : AnnotationDB (optional)
         Annotation database, by default the standard remoate annotation DB
 
     **kwargs
@@ -102,7 +102,10 @@ class Recorder(HasTraits):
     Like all context managers, this class should be used in a `with` statement::
 
         with Recorder() as graph:
-            [...]
+            from sklearn.datasets import make_blobs
+            X, labels = make_blobs(n_samples=100, n_features=2, centers=3)
+
+    For most use cases, it is simpler to use `record_code` or `record_script`.
     """
     builder = Instance(FlowGraphBuilder)
     tracer = Instance(Tracer)
