@@ -61,8 +61,7 @@ class FlowGraphBuilder(HasTraits):
     def graph(self):
         """ Top-level flow graph.
         """
-        # Make a shallow copy.
-        return nx.MultiDiGraph(self._stack[0].graph)
+        return self._stack[0].graph
     
     def push_event(self, event):
         """ Push a new TraceEvent to the builder.

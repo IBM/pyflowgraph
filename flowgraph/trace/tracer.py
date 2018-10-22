@@ -164,9 +164,10 @@ class Tracer(HasTraits):
         
         # No interference from this package.
         # Calls that can be picked up include:
+        #   - Recorder.__exit__
         #   - Tracer.__exit__
         #   - Garbage collection callback from ObjectTracker
-        if module.startswith('flowgraph.trace') and not 'tests' in module:
+        if module.startswith('flowgraph') and not 'tests' in module:
             return False
         
         # The final test is an explicit blacklist of functions to ignore. 

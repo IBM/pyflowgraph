@@ -12,11 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-""" Operations on flow graphs.
+""" Create and manipulate flow graphs.
 
-This module contains functions that create empty flow graphs and operate on
+This module contains functions that create empty flow graphs and manipulate
 existing flow graphs. To create a new flow graph by tracing Python code, see the
-`flow_graph_builder` module.
+`flow_graph_builder` and `record` modules.
 
 These graphs are sometimes called "concrete" or "raw" flow graphs to
 distinguish them from other dataflow graphs in the Open Discovery system.

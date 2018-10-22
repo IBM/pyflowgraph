@@ -28,12 +28,32 @@ from ..flow_graph import new_flow_graph, flatten, join, \
 from ..flow_graph_builder import FlowGraphBuilder
 from ..graphutil import find_node
 from ..graphml import read_graphml_str, write_graphml_str
+from ..record import Recorder
 from . import objects
 
 
 class TestFlowGraph(unittest.TestCase):
     """ Tests for Python flow graph machinery.
     """
+
+    @classmethod
+    def setUpClass(cls):
+        """ Create annotation DB and tracer.
+        """
+        objects_path = Path(objects.__file__).parent
+        json_path = objects_path.joinpath('data', 'annotations.json')
+        cls.db = AnnotationDB()
+        cls.db.load_file(str(json_path))
+        cls.tracer = Tracer(modules=['flowgraph.core.tests.test_flow_graph'])
+        cls.id = cls.tracer.object_tracker.get_id # For convenience
+
+    def record(self, **kwargs):
+        """ Record block of code for test.
+        """
+        builder = FlowGraphBuilder(**kwargs)
+        builder.annotator.db = self.db
+        tracer = self.tracer
+        return Recorder(builder=builder, tracer=tracer)
     
     def assert_isomorphic(self, g1, g2, check_id=True):
         """ Assert that two flow graphs are isomorphic.
@@ -59,35 +79,15 @@ class TestFlowGraph(unittest.TestCase):
             ports = OrderedDict((p, data) for p, data in ports.items()
                                 if data['portkind'] == portkind)
         return ports
-
-    def setUp(self):
-        """ Create the tracer and flow graph builder.
-        """
-        objects_path = Path(objects.__file__).parent
-        json_path = objects_path.joinpath('data', 'annotations.json')
-        db = AnnotationDB()
-        db.load_file(str(json_path))
-        
-        self.builder = FlowGraphBuilder()
-        self.builder.annotator.db = db
-        self.tracer = Tracer()
-        self.tracer.modules = [ 'flowgraph.core.tests.test_flow_graph' ]
-        self.id = self.tracer.object_tracker.get_id # For convenience
-        
-        def handler(changed):
-            event = changed['new']
-            if event:
-                self.builder.push_event(event)
-        self.tracer.observe(handler, 'event')
     
     def test_two_object_flow(self):
         """ Check a simple, two-object flow.
         """
-        with self.tracer:
+        with self.record() as actual:
             foo = objects.Foo()
             bar = objects.bar_from_foo(foo)
         
-        actual = self.builder.graph
+        print(list(actual.nodes()))
         target = new_flow_graph()
         outputs = target.graph['output_node']
         target.add_node('1', qual_name='Foo.__init__')
@@ -102,10 +102,9 @@ class TestFlowGraph(unittest.TestCase):
         """ Check a simple, two-object flow with input from external object.
         """
         foo = objects.Foo()
-        with self.tracer:
+        with self.record() as actual:
             bar = objects.bar_from_foo(foo)
         
-        actual = self.builder.graph
         target = new_flow_graph()
         inputs, outputs = target.graph['input_node'], target.graph['output_node']
         target.add_node('1', qual_name='bar_from_foo')
@@ -116,12 +115,11 @@ class TestFlowGraph(unittest.TestCase):
     def test_three_object_flow(self):
         """ Check a simple, three-object flow.
         """
-        with self.tracer:
+        with self.record() as actual:
             foo = objects.Foo()
             bar = objects.bar_from_foo(foo)
             baz = objects.baz_from_bar(bar)
         
-        actual = self.builder.graph
         target = new_flow_graph()
         outputs = target.graph['output_node']
         target.add_node('1', qual_name='Foo.__init__')
@@ -139,12 +137,11 @@ class TestFlowGraph(unittest.TestCase):
     def test_nonpure_flow(self):
         """ Test that pure and non-pure functions are handled differently.
         """
-        with self.tracer:
+        with self.record() as actual:
             foo = objects.Foo()
             bar = objects.bar_from_foo_mutating(foo)
             baz = objects.baz_from_foo(foo)
         
-        actual = self.builder.graph
         target = new_flow_graph()
         outputs = target.graph['output_node']
         target.add_node('1', qual_name='Foo.__init__')
@@ -162,12 +159,11 @@ class TestFlowGraph(unittest.TestCase):
     def test_pure_flow(self):
         """ Test that pure and non-pure functions are handled differently.
         """
-        with self.tracer:
+        with self.record() as actual:
             foo = objects.Foo()
             bar = objects.bar_from_foo(foo)
             baz = objects.baz_from_foo(foo)
         
-        actual = self.builder.graph
         target = new_flow_graph()
         outputs = target.graph['output_node']
         target.add_node('1', qual_name='Foo.__init__')
@@ -185,10 +181,9 @@ class TestFlowGraph(unittest.TestCase):
     def test_class_methods(self):
         """ Test that class methods are represented correctly.
         """
-        with self.tracer:
+        with self.record() as actual:
             bar = objects.Bar.make_bar()
         
-        actual = self.builder.graph
         target = new_flow_graph()
         outputs = target.graph['output_node']
         target.add_node('1', qual_name='Bar.make_bar')
@@ -198,10 +193,9 @@ class TestFlowGraph(unittest.TestCase):
     def test_singly_nested(self):
         """ Test that nested function calls are mapped to a nested subgraph.
         """
-        with self.tracer:
+        with self.record() as actual:
             bar = outer_bar()
         
-        actual = self.builder.graph
         target = new_flow_graph()
         outputs = target.graph['output_node']
         target.add_node('1', qual_name='outer_bar')
@@ -222,10 +216,10 @@ class TestFlowGraph(unittest.TestCase):
     def test_flatten_singly_nested(self):
         """ Test that a singly nested function call can be flattened.
         """
-        with self.tracer:
+        with self.record() as graph:
             bar = outer_bar()
         
-        actual = flatten(self.builder.graph)
+        actual = flatten(graph)
         target = new_flow_graph()
         outputs = target.graph['output_node']
         target.add_node('1', qual_name='Foo.__init__')
@@ -237,11 +231,10 @@ class TestFlowGraph(unittest.TestCase):
     def test_doubly_nested(self):
         """ Test that doubly nested function calls are handled.
         """
-        with self.tracer:
+        with self.record() as actual:
             foo = objects.Foo()
             bar = outer_bar_from_foo(foo)
-            
-        actual = self.builder.graph
+        
         target = new_flow_graph()
         outputs = target.graph['output_node']
         target.add_node('1', qual_name='Foo.__init__')
@@ -275,11 +268,11 @@ class TestFlowGraph(unittest.TestCase):
     def test_flatten_doubly_nested(self):
         """ Test that doubly nested function calls can be flattened.
         """
-        with self.tracer:
+        with self.record() as graph:
             foo = objects.Foo()
             bar = outer_bar_from_foo(foo)
             
-        actual = flatten(self.builder.graph)
+        actual = flatten(graph)
         target = new_flow_graph()
         outputs = target.graph['output_node']
         target.add_node('1', qual_name='Foo.__init__')
@@ -293,14 +286,13 @@ class TestFlowGraph(unittest.TestCase):
     def test_attributes_methods(self):
         """ Test that attribute accesses and method calls are traced.
         """
-        with self.tracer:
+        with self.record() as actual:
             foo = objects.Foo()
             x = foo.x
             y = foo.y
             foo_sum = foo.do_sum()
             foo_prod = foo.do_prod()
         
-        actual = self.builder.graph
         target = new_flow_graph()
         outputs = target.graph['output_node']
         target.add_node('1', qual_name='Foo.__init__')
@@ -321,11 +313,10 @@ class TestFlowGraph(unittest.TestCase):
     def test_higher_order_function(self):
         """ Test that higher-order functions using user-defined functions work.
         """
-        with self.tracer:
+        with self.record() as actual:
             foo = objects.Foo()
             foo.apply(lambda x: objects.Bar(x))
         
-        actual = self.builder.graph
         target = new_flow_graph()
         outputs = target.graph['output_node']
         target.add_node('1', qual_name='Foo.__init__')
@@ -338,13 +329,12 @@ class TestFlowGraph(unittest.TestCase):
     def test_track_inside_list(self):
         """ Test a function call with tracked objects inside a list.
         """
-        with self.tracer:
+        with self.record() as actual:
             foo1 = objects.Foo()
             foo2 = objects.Foo()
             foos = [foo1, foo2]
             objects.foo_x_sum(foos)
         
-        actual = self.builder.graph
         target = new_flow_graph()
         outputs = target.graph['output_node']
         target.add_node('1', qual_name='Foo.__init__')
@@ -361,11 +351,10 @@ class TestFlowGraph(unittest.TestCase):
     def test_function_annotations(self):
         """ Test that function annotations are stored on nodes.
         """
-        with self.tracer:
+        with self.record() as graph:
             foo = objects.create_foo()
             bar = objects.bar_from_foo(foo)
         
-        graph = self.builder.graph
         node = find_node(graph, lambda n: n.get('qual_name') == 'create_foo')
         actual = graph.nodes[node]
         actual.pop('ports', None)
@@ -392,11 +381,10 @@ class TestFlowGraph(unittest.TestCase):
     def test_object_annotations(self):
         """ Test that object annotations are stored on edges.
         """
-        with self.tracer:
+        with self.record() as graph:
             foo = objects.create_foo()
             bar = objects.bar_from_foo(foo)
             
-        graph = self.builder.graph
         output_node = graph.graph['output_node']
         foo_node = find_node(graph, lambda n: n.get('qual_name') == 'create_foo')
         bar_node = find_node(graph, lambda n: n.get('qual_name') == 'bar_from_foo')
@@ -421,10 +409,9 @@ class TestFlowGraph(unittest.TestCase):
     def test_constructor_annotations(self):
         """ Test that constructors of annotated objects are annotated.
         """
-        with self.tracer:
+        with self.record() as graph:
             foo = objects.Foo()
         
-        graph = self.builder.graph
         node = find_node(graph, lambda n: n.get('qual_name') == 'Foo.__init__')
         actual = graph.nodes[node]
         actual.pop('ports', None)
@@ -439,11 +426,10 @@ class TestFlowGraph(unittest.TestCase):
     def test_input_ports(self):
         """ Test that data for input ports is stored.
         """
-        with self.tracer:
+        with self.record() as graph:
             foo = objects.create_foo()
             bar = objects.bar_from_foo(foo, 10)
         
-        graph = self.builder.graph
         node = find_node(graph, lambda n: n.get('qual_name') == 'bar_from_foo')
         actual = self.get_ports(graph, node, 'input')
         desired = OrderedDict([
@@ -474,10 +460,9 @@ class TestFlowGraph(unittest.TestCase):
     def test_input_ports_varargs(self):
         """ Test that varargs and keyword arguments are stored.
         """
-        with self.tracer:
+        with self.record() as graph:
             objects.sum_varargs(1,2,3,w=4)
         
-        graph = self.builder.graph
         node = find_node(graph, lambda n: n.get('qual_name') == 'sum_varargs')
         actual = self.get_ports(graph, node, 'input')
         desired = OrderedDict([
@@ -511,11 +496,10 @@ class TestFlowGraph(unittest.TestCase):
     def test_output_data(self):
         """ Test that data for output ports is stored.
         """
-        with self.tracer:
+        with self.record() as graph:
             foo = objects.create_foo()
             x = foo.do_sum()
         
-        graph = self.builder.graph
         node = find_node(graph, lambda n: n.get('qual_name') == 'Foo.do_sum')
         actual = self.get_ports(graph, node, 'output')
         desired = OrderedDict([
@@ -547,11 +531,10 @@ class TestFlowGraph(unittest.TestCase):
     def test_output_data_mutating(self):
         """ Test that output ports are created for mutated arguments.
         """
-        with self.tracer:
+        with self.record() as graph:
             foo = objects.Foo()
             bar = objects.bar_from_foo_mutating(foo)
             
-        graph = self.builder.graph
         node = find_node(graph, lambda n: n.get('qual_name') == 'bar_from_foo_mutating')
         actual = self.get_ports(graph, node, 'output')
         desired = OrderedDict([
@@ -579,10 +562,9 @@ class TestFlowGraph(unittest.TestCase):
     def test_multiple_outputs(self):
         """ Test that multiple outputs are created for tuple return values.
         """
-        with self.tracer:
+        with self.record() as graph:
             foo, bar = objects.create_foo_and_bar()
         
-        graph = self.builder.graph
         target = new_flow_graph()
         outputs = target.graph['output_node']
         target.add_node('1', qual_name='create_foo_and_bar')
@@ -615,11 +597,9 @@ class TestFlowGraph(unittest.TestCase):
     def test_object_slots_disabled(self):
         """ Test that capture of annotated object slots can be disabled.
         """
-        self.builder.store_slots = False
-        with self.tracer:
+        with self.record(store_slots=False) as actual:
             foo = objects.FooSlots()
         
-        actual = self.builder.graph
         target = new_flow_graph()
         outputs = target.graph['output_node']
         target.add_node('1', qual_name='FooSlots.__init__')
@@ -629,13 +609,12 @@ class TestFlowGraph(unittest.TestCase):
     def test_object_slots_track_getattr(self):
         """ Test that annotated object slots are captured on explicit getattrs.
         """
-        self.builder.store_slots = False
-        with self.tracer:
+        with self.record(store_slots=False) as graph:
             foo = objects.FooSlots()
             x = foo.x
             y = foo.y
         
-        actual = graph = self.builder.graph
+        actual = graph
         target = new_flow_graph()
         outputs = target.graph['output_node']
         target.add_node('foo', qual_name='FooSlots.__init__')
@@ -669,10 +648,10 @@ class TestFlowGraph(unittest.TestCase):
     def test_object_slots_primitive(self):
         """ Test that annotated object slots with primitive values are captured.
         """
-        with self.tracer:
+        with self.record() as graph:
             foo = objects.FooSlots()
         
-        actual = graph = self.builder.graph
+        actual = graph
         target = new_flow_graph()
         outputs = target.graph['output_node']
         target.add_node('1', qual_name='FooSlots.__init__')
@@ -710,11 +689,10 @@ class TestFlowGraph(unittest.TestCase):
     def test_object_slots_trackable(self):
         """ Test that annotated object slots with trackable values are captured.
         """
-        with self.tracer:
+        with self.record() as actual:
             container = objects.FooContainer()
         foo = container.foo
         
-        actual = self.builder.graph
         target = new_flow_graph()
         outputs = target.graph['output_node']
         target.add_node('1', qual_name='FooContainer.__init__')
@@ -728,22 +706,17 @@ class TestFlowGraph(unittest.TestCase):
     def test_two_join_three_object_flow(self):
         """ Test join of simple, three-object flow captured in two stages.
         """
-        with self.tracer:
+        with self.record() as full:
             foo = objects.Foo()
             bar = objects.bar_from_foo(foo)
             baz = objects.baz_from_bar(bar)
-        full = self.builder.graph
     
-        self.builder.reset()
-        with self.tracer:
+        with self.record() as first:
             foo = objects.Foo()
-        first = self.builder.graph
         
-        self.builder.reset()
-        with self.tracer:
+        with self.record() as second:
             bar = objects.bar_from_foo(foo)
             baz = objects.baz_from_bar(bar)
-        second = self.builder.graph
         
         joined = join(first, second)
         self.assert_isomorphic(joined, full, check_id=False)
@@ -751,26 +724,19 @@ class TestFlowGraph(unittest.TestCase):
     def test_three_join_three_object_flow(self):
         """ Test join of simple, three-object flow captured in three stages.
         """
-        with self.tracer:
+        with self.record() as full:
             foo = objects.Foo()
             bar = objects.bar_from_foo(foo)
             baz = objects.baz_from_bar(bar)
-        full = self.builder.graph
     
-        self.builder.reset()
-        with self.tracer:
+        with self.record() as first:
             foo = objects.Foo()
-        first = self.builder.graph
         
-        self.builder.reset()
-        with self.tracer:
+        with self.record() as second:
             bar = objects.bar_from_foo(foo)
-        second = self.builder.graph
         
-        self.builder.reset()
-        with self.tracer:
+        with self.record() as third:
             baz = objects.baz_from_bar(bar)
-        third = self.builder.graph
         
         joined = join(join(first, second), third)
         self.assert_isomorphic(joined, full, check_id=False)
@@ -781,20 +747,15 @@ class TestFlowGraph(unittest.TestCase):
     def test_two_join_mutation(self):
         """ Test join of two-object flow with mutation of the first object.
         """
-        with self.tracer:
+        with self.record() as full:
             foo = objects.Foo()
             bar = objects.bar_from_foo_mutating(foo)
-        full = self.builder.graph
         
-        self.builder.reset()
-        with self.tracer:
+        with self.record() as first:
             foo = objects.Foo()
-        first = self.builder.graph
         
-        self.builder.reset()
-        with self.tracer:
+        with self.record() as second:
             bar = objects.bar_from_foo_mutating(foo)
-        second = self.builder.graph
     
         joined = join(first, second)
         self.assert_isomorphic(joined, full, check_id=False)
@@ -802,10 +763,9 @@ class TestFlowGraph(unittest.TestCase):
     def test_graphml_serialization(self):
         """ Can a flow graph be roundtripped through GraphML?
         """
-        with self.tracer:
+        with self.record() as graph:
             foo = objects.Foo()
             bar = objects.bar_from_foo(foo)
-        graph = self.builder.graph
         
         xml = write_graphml_str(flow_graph_to_graphml(graph))
         recovered = flow_graph_from_graphml(read_graphml_str(xml, multigraph=True))
@@ -816,11 +776,11 @@ class TestFlowGraph(unittest.TestCase):
     def test_graphml_output_ports(self):
         """ Does a GraphML-serialized flow graph have correct output ports?
         """
-        with self.tracer:
+        with self.record() as recorded_graph:
             foo = objects.Foo()
             bar = objects.bar_from_foo(foo)
         
-        outer = flow_graph_to_graphml(self.builder.graph)
+        outer = flow_graph_to_graphml(recorded_graph)
         root = list(outer.nodes)[0]
         graph, ports = outer.nodes[root]['graph'], outer.nodes[root]['ports']
         # FIXME: Outputs ports should have a deterministic order.
@@ -840,7 +800,7 @@ class TestFlowGraph(unittest.TestCase):
         ])
         self.assertEqual(outputs, { self.id(foo), self.id(bar) })
         
-        outer = flow_graph_to_graphml(self.builder.graph, simplify_outputs=True)
+        outer = flow_graph_to_graphml(recorded_graph, simplify_outputs=True)
         root = list(outer.nodes)[0]
         graph, ports = outer.nodes[root]['graph'], outer.nodes[root]['ports']
         outputs = { data['id'] for _, _, data in
