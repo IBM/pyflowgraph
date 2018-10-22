@@ -30,4 +30,4 @@ from .core.record import record_code
 def cli(script, out):
     code = script.read()
     out = out or (sys.stdout.buffer if six.PY3 else sys.stdout)
-    graph = record_code(code, out=out)
+    graph = record_code(code, out=out, store_slots=False)
