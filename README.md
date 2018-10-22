@@ -4,6 +4,23 @@
 
 **Record dataflow graphs of Python programs using dynamic program analysis.**
 
-The package can be used standalone but is designed primarily to be used in conjunction with our [semantic analysis](https://github.com/IBM/semanticflowgraph) tools. The main use case is analyzing short scripts in data science and scientific computing. This package is not appropriate for analyzing large-scale industrial software.
+The package can be used standalone but is designed primarily to be used in
+conjunction with our [semantic flow
+graphs](https://github.com/IBM/semanticflowgraph). The main use case is
+analyzing short scripts in data science and scientific computing. This package
+is not appropriate for analyzing large-scale industrial software.
 
 This is **alpha** software. Contributions are welcome!
+
+## Command-line interface
+
+The package ships with a minimal CLI, invokable as `python -m flowgraph`.
+You can use the CLI to run and record a Python script as a raw flow graph.
+
+```
+python -m flowgraph input.py --out output.graphml
+```
+
+For a more comprehensive CLI, with support for recording, semantic enrichment,
+and visualization of flow graphs, see the Julia package for [semantic flow
+graphs](https://github.com/IBM/semanticflowgraph).
