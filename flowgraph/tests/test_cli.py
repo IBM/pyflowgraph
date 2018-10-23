@@ -34,8 +34,12 @@ class TestCLI(unittest.TestCase):
         """ Test that a file can be recorded using the CLI.
         """
         filename = str(data_path.joinpath('sklearn_make_blobs.py'))
-        runner = CliRunner()
+        runner = CliRunner(mix_stderr=False)
         result = runner.invoke(cli, [filename])
         xml = result.output
         graph = flow_graph_from_graphml(read_graphml_str(xml))
         self.assertGreater(len(graph), 0)
+
+
+if __name__ == '__main__':
+    unittest.main()
