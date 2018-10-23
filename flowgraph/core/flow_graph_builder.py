@@ -28,7 +28,6 @@ from flowgraph.trace.frame_util import get_class_module, get_class_qual_name
 from flowgraph.trace.object_tracker import ObjectTracker
 from flowgraph.trace.trace_event import TraceEvent, TraceCall, TraceReturn
 from .annotator import Annotator
-from .graphutil import node_name
 from .flow_graph import new_flow_graph
 
 
@@ -49,6 +48,7 @@ class FlowGraphBuilder(HasTraits):
     store_slots = Bool(True)
     
     # Private traits.
+    _node_names = Dict()
     _stack = List() # List(Instance(_CallContext))
     
     # Public interface
@@ -79,6 +79,7 @@ class FlowGraphBuilder(HasTraits):
         # The bottom of the call stack does not correspond to a call event.
         # It simply contains the root flow graph and associated state.
         graph = new_flow_graph()
+        self._node_names = {}
         self._stack = [ _CallContext(graph=graph) ]
     
     def is_primitive(self, obj):
@@ -210,7 +211,7 @@ class FlowGraphBuilder(HasTraits):
         """
         context = self._stack[-1]
         graph = context.graph
-        node = node_name(graph, event.qual_name)
+        node = self._node_name(event.qual_name)
         data = {
             'module': event.module,
             'qual_name': event.qual_name,
@@ -409,7 +410,7 @@ class FlowGraphBuilder(HasTraits):
                 slot_value = get_slot(obj, slot)
             except AttributeError:
                 continue
-            slot_node = node_name(graph, 'slot')
+            slot_node = self._node_name('slot:' + str(slot))
             slot_node_data = {
                 'slot': slot,
                 'annotation': self._annotation_key(note),
@@ -517,6 +518,15 @@ class FlowGraphBuilder(HasTraits):
             for referent in gc.get_referents(obj):
                 if tracker.is_tracked(referent):
                     yield referent
+    
+    def _node_name(self, base):
+        """ Get node name unique within flow graph, including nested graphs.
+
+        The node names are deterministic across runs.
+        """
+        count = self._node_names.get(base, 0) + 1
+        self._node_names[base] = count
+        return base + ":" + str(count)
     
     def _mutated_port_name(self, arg_name):
         """ Get name of output port for a mutated argument.
