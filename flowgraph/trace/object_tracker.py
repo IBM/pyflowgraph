@@ -15,27 +15,31 @@
 from __future__ import absolute_import
 
 import six
-import uuid
 import types
 import weakref
 
-from traitlets import HasTraits, Dict
+from traitlets import HasTraits, Dict, Int
 
 
 class ObjectTracker(HasTraits):
     """ Allow object lookup by ID without creating references to the object.
     
     The IDs are strings that uniquely identify the object. Unlike the integer
-    IDs returned by Python's `id` function, these IDs are unique for all time.
+    IDs returned by Python's `id` function, which can be recycled when objects
+    are garbage collected, these IDs are guaranteed to be unique across the
+    lifetime of the object tracker.
     """
     
     # Map: memory address -> object ID.
     _mem_map = Dict()
 
     # Map: object ID -> weakref.
-    # Semantically, we would prefer a WeakValueDictionary, but it requires
-    # its contents to be hashable.
+    # We would prefer to use a `WeakValueDictionary`, but it requires its
+    # contents to be hashable.
     _ref_map = Dict()
+
+    # Running counter to generate object IDs.
+    _id_count = Int()
 
     def get_object(self, obj_id):
         """ Look up an object by ID.
@@ -95,7 +99,8 @@ class ObjectTracker(HasTraits):
             return self._mem_map[obj_addr]
         
         # Generate a new object ID.
-        obj_id = uuid.uuid4().hex
+        self._id_count += 1
+        obj_id = str(self._id_count)
         
         def obj_gc_callback(ref):
             try:
