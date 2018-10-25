@@ -13,6 +13,8 @@ setup_args = {
     'install_requires': [
         'pathlib2',
         'six',
+        'astor',
+        'funcsigs',
         'traitlets',
         'requests',
         'jsonpickle',
