@@ -26,8 +26,6 @@ except ImportError:
     # Python 2.7 to 3.2
     from funcsigs import signature
 
-import astor
-
 
 def make_tracing_call_wrapper(on_call=None, on_return=None):
     """ Higher-order function to create call wrappers for tracing.
@@ -75,7 +73,7 @@ def bind_arguments(fun, *args, **kwargs):
     return bound.arguments
 
 
-class WrapCalls(astor.TreeWalk):
+class WrapCalls(ast.NodeTransformer):
     """ Wrap all function and method calls in AST.
 
     Replaces function and method calls, e.g.
@@ -87,12 +85,12 @@ class WrapCalls(astor.TreeWalk):
         wrapper(f, x, y, z=1)
     """
 
-    def __init__(self, wrapper, node=None):
-        astor.TreeWalk.__init__(self, node=node)
+    def __init__(self, wrapper):
+        super(WrapCalls, self).__init__()
         self.wrapper = wrapper
     
-    def post_Call(self):
-        call = self.cur_node
+    def visit_Call(self, call):
+        self.generic_visit(call)
         new_args = [ call.func ] + call.args
         if sys.version_info.major >= 3 and sys.version_info.minor >= 5:
             # Representation of *args and **kwargs changed in Python 3.5.
@@ -100,4 +98,4 @@ class WrapCalls(astor.TreeWalk):
         else:
             new_call = ast.Call(self.wrapper, new_args, call.keywords,
                                 call.starargs, call.kwargs)
-        self.replace(new_call)
+        return new_call

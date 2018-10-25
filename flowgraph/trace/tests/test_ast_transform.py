@@ -15,6 +15,7 @@
 from __future__ import absolute_import
 
 import ast
+import six
 from textwrap import dedent
 import unittest
 
@@ -49,13 +50,12 @@ class TestASTTransform(unittest.TestCase):
         """
         from fractions import Fraction
 
-        walker = WrapCalls(ast.Name('wrapper', ast.Load()))
         node = ast.parse(dedent("""
         from fractions import Fraction
         x = Fraction(3,7)
         y = x.limit_denominator(2)
         """))
-        walker.walk(node)
+        WrapCalls(ast.Name('wrapper', ast.Load())).visit(node)
 
         history = []
         env = dict(wrapper=self.make_history_call_wrapper(history))
@@ -72,9 +72,8 @@ class TestASTTransform(unittest.TestCase):
     def test_tracing_call_wrapper_builtins(self):
         """ Can we rewrite calls of builtin functions?
         """
-        walker = WrapCalls(ast.Name('wrapper', ast.Load()))
         node = ast.parse('x = sum(range(5))')
-        walker.walk(node)
+        WrapCalls(ast.Name('wrapper', ast.Load())).visit(node)
         
         history = []
         env = dict(wrapper=self.make_history_call_wrapper(history))
@@ -83,7 +82,7 @@ class TestASTTransform(unittest.TestCase):
         self.assertEqual(history, [
             ('call', 'range', [('__arg0__',5)]),
             ('return', 'range', range(5)),
-            ('call', 'sum', [('iterable',range(5))]),
+            ('call', 'sum', [('iterable' if six.PY3 else '__arg0__',range(5))]),
             ('return', 'sum', sum(range(5))),
         ])
 
