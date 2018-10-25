@@ -67,6 +67,10 @@ class FooContainer(object):
         return self.foo
 
 
+class Empty(object):
+    pass
+
+
 def create_foo():
     return Foo()
 

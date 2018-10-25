@@ -51,6 +51,7 @@ class TestInspectNames(unittest.TestCase):
         """
         module = objects.__name__
         self.assertEqual(get_func_module_name(objects.create_foo), module)
+        self.assertEqual(get_func_module_name(objects.Foo), module)
         self.assertEqual(get_func_module_name(objects.Foo.do_sum), module)
         self.assertEqual(get_func_module_name(objects.Foo().do_sum), module)
     
@@ -61,6 +62,7 @@ class TestInspectNames(unittest.TestCase):
             self.assertEqual(get_func_qual_name(func), name)
         
         assert_qual_name(toplevel, 'toplevel')
+        assert_qual_name(Toplevel, 'Toplevel')
         assert_qual_name(Toplevel().f, 'Toplevel.f')
         assert_qual_name(Toplevel.f_cls, 'Toplevel.f_cls')
         if sys.version_info[0] >= 3:

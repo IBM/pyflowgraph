@@ -130,7 +130,7 @@ class FlowGraphBuilder(HasTraits):
         """
         # Special case: certain methods are never pure.
         func_name = event.qual_name.split('.')[-1]
-        mutating_methods = ('__init__', '__setattr__', '__setitem__')
+        mutating_methods = ('__setattr__', '__setitem__')
         if func_name in mutating_methods and arg_name == 'self':
             return False
         
@@ -251,9 +251,9 @@ class FlowGraphBuilder(HasTraits):
             elif not annotation:
                 self._update_getattr_node_for_return(event, node)
         
-        elif event.name == '__init__' and not annotation:
+        elif isinstance(event.function, type) and not annotation:
             # Record the object initializer as a constructor.
-            self._update_init_node_for_return(event, node)
+            self._update_constructor_node_for_return(event, node)
         
         # Add output ports.
         port_names = []
@@ -299,14 +299,12 @@ class FlowGraphBuilder(HasTraits):
         else:
             data['slot'] = name
     
-    def _update_init_node_for_return(self, event, node):
-        """ Update an `__init__` call node for a return event.
+    def _update_constructor_node_for_return(self, event, node):
+        """ Update an object constructor call node for a return event.
         """
         context = self._stack[-1]
         data = context.graph.nodes[node]
-        
-        obj = list(event.arguments.values())[0]
-        note = self.annotator.notate_object(obj)
+        note = self.annotator.notate_object(event.return_value)
         if note:
             data.update({
                 'annotation': self._annotation_key(note),

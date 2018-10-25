@@ -23,10 +23,10 @@ from cachetools import cachedmethod
 from cachetools.keys import hashkey
 from traitlets import HasTraits, Dict, Instance
 
-from flowgraph.trace.inspect_names import get_class_module_name, \
-    get_class_full_name, get_func_full_name
 from .annotation_db import AnnotationDB
 from .remote_annotation_db import RemoteAnnotationDB
+from ..trace.inspect_names import get_class_module_name, \
+    get_class_full_name, get_func_full_name
 
 
 class Annotator(HasTraits):
@@ -49,9 +49,12 @@ class Annotator(HasTraits):
     
     def notate_function(self, func):
         """ Find annotation for a Python function.
+
+        By a "function", we actually mean any callable object
+        (function, instance method, class method, type, etc.).
         """
-        if not isinstance(func, (types.FunctionType, types.MethodType)):
-            raise TypeError("Argument not a function or method object")
+        if not callable(func):
+            raise TypeError("Attempt to annotate non-callable as function")
         
         pk = self._cached_notate_function(func)
         return self.db.get({'pk': pk}) if pk else None          

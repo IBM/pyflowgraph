@@ -98,6 +98,22 @@
     ]
   },
   {
+    "_id": "annotation/python/flowgraph/new-empty",
+    "schema": "annotation",
+    "language": "python",
+    "package": "flowgraph",
+    "id": "new-empty",
+    "kind": "morphism",
+    "function": "flowgraph.core.tests.objects.Empty",
+    "domain": [],
+    "codomain": [
+      {
+        "slot": "__return__",
+        "name": "empty"
+      }
+    ]
+  },
+  {
     "_id": "annotation/python/flowgraph/bar-from-foo",
     "schema": "annotation",
     "language": "python",
