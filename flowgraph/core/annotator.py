@@ -23,8 +23,8 @@ from cachetools import cachedmethod
 from cachetools.keys import hashkey
 from traitlets import HasTraits, Dict, Instance
 
-from flowgraph.trace.frame_util import get_class_module, get_class_full_name, \
-    get_func_full_name
+from flowgraph.trace.inspect_names import get_class_module_name, \
+    get_class_full_name, get_func_full_name
 from .annotation_db import AnnotationDB
 from .remote_annotation_db import RemoteAnnotationDB
 
@@ -133,7 +133,7 @@ class Annotator(HasTraits):
         # Find the best (highest precedence) annotation.
         best = None
         for name, subclass in subclasses.items():
-            package = get_class_module(subclass).split('.')[0]
+            package = get_class_module_name(subclass).split('.')[0]
             query = {
                 'language': 'python',
                 'package': package,

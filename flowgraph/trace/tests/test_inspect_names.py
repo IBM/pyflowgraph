@@ -19,18 +19,18 @@ import unittest
 import sys
 
 from flowgraph.core.tests import objects
-from ..frame_util import *
+from ..inspect_names import *
 
 
-class TestFrameUtil(unittest.TestCase):
-    """ Test cases for frame utility functions.
+class TestInspectNames(unittest.TestCase):
+    """ Test cases for inspecting names of classes and functions.
     """
     
-    def test_get_class_module(self):
+    def test_get_class_module_name(self):
         """ Can we get the module in which a class is defined?
         """
         module = objects.__name__
-        self.assertEqual(get_class_module(objects.Foo), module)
+        self.assertEqual(get_class_module_name(objects.Foo), module)
     
     def test_get_class_qual_name(self):
         """ Can we get the qualified name of a class?
@@ -46,13 +46,13 @@ class TestFrameUtil(unittest.TestCase):
         self.assertEqual(get_class_full_name(objects.Foo), full_name)
         self.assertEqual(get_class_full_name(str), 'str')
     
-    def test_get_func_module(self):
+    def test_get_func_module_name(self):
         """ Can we get the module in which a function object is defined?
         """
         module = objects.__name__
-        self.assertEqual(get_func_module(objects.create_foo), module)
-        self.assertEqual(get_func_module(objects.Foo.do_sum), module)
-        self.assertEqual(get_func_module(objects.Foo().do_sum), module)
+        self.assertEqual(get_func_module_name(objects.create_foo), module)
+        self.assertEqual(get_func_module_name(objects.Foo.do_sum), module)
+        self.assertEqual(get_func_module_name(objects.Foo().do_sum), module)
     
     def test_get_func_qual_name(self):
         """ Can we get the qualified name of a function object?
@@ -74,33 +74,6 @@ class TestFrameUtil(unittest.TestCase):
         full_name = objects.__name__ + '.create_foo'
         self.assertEqual(get_func_full_name(objects.create_foo), full_name)
         self.assertEqual(get_class_full_name(map), 'map')
-    
-    def test_get_frame_module(self):
-        """ Can we get the name of this module from a frame?
-        """
-        self.assertEqual(get_frame_module(inspect.currentframe()),
-                         'flowgraph.trace.tests.test_frame_util')
-    
-    def test_get_frame_func(self):
-        """ Can we get the function object from a frame?
-        """
-        def assert_frame_func(frame, name):
-            self.assertTrue(inspect.isframe(frame))
-            self.assertEqual(get_frame_func(frame), name)
-        
-        assert_frame_func(toplevel(), toplevel)
-        assert_frame_func(lambda_f(), lambda_f)
-        
-        inner = nested()
-        assert_frame_func(inner(), inner)
-        
-        top = Toplevel()
-        assert_frame_func(top.f(), top.f)
-        assert_frame_func(Toplevel.f_cls(), Toplevel.f_cls)
-        assert_frame_func(Toplevel().f_static(), Toplevel.f_static)
-        
-        inner = Nested()()
-        assert_frame_func(inner.g(), inner.g)
 
 
 # Test data

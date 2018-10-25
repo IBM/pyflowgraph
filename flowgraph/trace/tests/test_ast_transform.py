@@ -55,10 +55,10 @@ class TestASTTransform(unittest.TestCase):
         x = Fraction(3,7)
         y = x.limit_denominator(2)
         """))
-        WrapCalls(ast.Name('wrapper', ast.Load())).visit(node)
+        WrapCalls('__trace__').visit(node)
 
         history = []
-        env = dict(wrapper=self.make_history_call_wrapper(history))
+        env = dict(__trace__=self.make_history_call_wrapper(history))
         self.exec_ast(node, env=env)
         self.assertEqual(env['x'], Fraction(3,7))
         self.assertEqual(env['y'], Fraction(1,2))
@@ -73,16 +73,16 @@ class TestASTTransform(unittest.TestCase):
         """ Can we rewrite calls of builtin functions?
         """
         node = ast.parse('x = sum(range(5))')
-        WrapCalls(ast.Name('wrapper', ast.Load())).visit(node)
+        WrapCalls('__trace__').visit(node)
         
         history = []
-        env = dict(wrapper=self.make_history_call_wrapper(history))
+        env = dict(__trace__=self.make_history_call_wrapper(history))
         self.exec_ast(node, env=env)
         self.assertEqual(env['x'], sum(range(5)))
         self.assertEqual(history, [
-            ('call', 'range', [('__arg0__',5)]),
+            ('call', 'range', [('0',5)]),
             ('return', 'range', range(5)),
-            ('call', 'sum', [('iterable' if six.PY3 else '__arg0__',range(5))]),
+            ('call', 'sum', [('iterable' if six.PY3 else '0',range(5))]),
             ('return', 'sum', sum(range(5))),
         ])
 

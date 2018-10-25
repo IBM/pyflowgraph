@@ -12,16 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-""" Utilities for working with frame objects.
+""" Inspect names of classes and functions.
 """
-from collections import OrderedDict
-import gc
-import inspect
 import sys
 import types
 
 
-def get_class_module(typ):
+def get_class_module_name(typ):
     """ Get name of module in which type was defined.
     """
     return _fix_module_name(typ.__module__)
@@ -40,14 +37,14 @@ def get_class_qual_name(typ):
 def get_class_full_name(typ):
     """ Get the full name of a class.
     """
-    module_name = get_class_module(typ)
+    module_name = get_class_module_name(typ)
     qual_name = get_class_qual_name(typ)
     if module_name == 'builtins':
         return qual_name
     return module_name + '.' + qual_name
 
 
-def get_func_module(func):
+def get_func_module_name(func):
     """ Get name of module in which the function object was defined.
     """
     return _fix_module_name(func.__module__)
@@ -81,74 +78,11 @@ def get_func_qual_name(func):
 def get_func_full_name(func):
     """ Get the full name of a function object.
     """
-    module_name = get_func_module(func)
+    module_name = get_func_module_name(func)
     qual_name = get_func_qual_name(func)
     if module_name == 'builtins':
         return qual_name
     return module_name + '.' + qual_name
-
-
-def get_frame_module(frame):
-    """ Get name of module containing the frame code.
-    
-    Returns None if the module cannot be identified.
-    """
-    try:
-        name = frame.f_globals['__name__']
-    except KeyError:
-        # Some frames, e.g. calls of IPython magics, belong to no module.
-        name = None
-    return _fix_module_name(name)
-
-def get_frame_func(frame, raise_on_ambiguous=True):
-    """ Get the function/method object of the called function in a frame.
-    """
-    code = frame.f_code
-    meth = None
-    # Special case 1: Instance method
-    if code.co_argcount > 0 and code.co_varnames[0] == 'self':
-        meth = getattr(frame.f_locals['self'], code.co_name, None)
-    # Special case 2: Class method
-    elif code.co_argcount > 0 and code.co_varnames[0] == 'cls':
-        meth = getattr(frame.f_locals['cls'], code.co_name, None)
-    if isinstance(meth, types.MethodType):
-        return meth
-    # The general case is not useful here since it will return the underlying
-    # function of the bound method, i.e., `meth.__func__`.
-    
-    # General case: fish the function out of the garbage collector.
-    # XXX: This is a terrible hack, but I don't know a better way.
-    funcs = [ ref for ref in gc.get_referrers(code)
-              if isinstance(ref, (types.FunctionType, types.LambdaType)) ]
-    if len(funcs) == 0:
-        raise ValueError("Could not find function object for frame")
-    elif len(funcs) > 1 and raise_on_ambiguous:
-        raise ValueError("Ambiguous function object for frame")
-    return funcs[0]
-
-def get_frame_arguments(frame):
-    """ Get all arguments of the called function in a frame.
-
-    Returns an OrderedDict whose keys are argument names and values are 
-    argument values.
-    """
-    try:
-        info = inspect.getargvalues(frame)
-    except TypeError:
-        # Inspection will fail for C extension functions. In that case,
-        # fall back to simpler logic which ignores * and ** arguments.
-        names = frame.f_code.co_varnames[:frame.f_code.co_argcount]
-        return OrderedDict((name, frame.f_locals[name]) for name in names)
-    
-    # Get all arguments, including * and ** arguments.
-    args = OrderedDict((name, info.locals[name]) for name in info.args)
-    if info.varargs:
-        varargs = info.locals[info.varargs]
-        args.update(('__vararg%i__' % i, arg) for i, arg in enumerate(varargs))
-    if info.keywords:
-        keywords = info.locals[info.keywords]
-        args.update((name, keywords[name]) for name in sorted(keywords))
-    return args
 
 
 def _fix_module_name(name):

@@ -24,7 +24,8 @@ import networkx as nx
 from traitlets import HasTraits, Bool, Dict, Instance, List, Unicode, default
 
 from flowgraph.kernel.slots import get_slot
-from flowgraph.trace.frame_util import get_class_module, get_class_qual_name
+from flowgraph.trace.inspect_names import get_class_module_name, \
+    get_class_qual_name
 from flowgraph.trace.object_tracker import ObjectTracker
 from flowgraph.trace.trace_event import TraceEvent, TraceCall, TraceReturn
 from .annotator import Annotator
@@ -61,7 +62,8 @@ class FlowGraphBuilder(HasTraits):
     def graph(self):
         """ Top-level flow graph.
         """
-        return self._stack[0].graph
+        # Make a shallow copy.
+        return nx.MultiDiGraph(self._stack[0].graph)
     
     def push_event(self, event):
         """ Push a new TraceEvent to the builder.
@@ -213,7 +215,7 @@ class FlowGraphBuilder(HasTraits):
         graph = context.graph
         node = self._node_name(event.qual_name)
         data = {
-            'module': event.module,
+            'module': event.module_name,
             'qual_name': event.qual_name,
             'ports': self._get_ports_data(
                 event,
@@ -477,9 +479,9 @@ class FlowGraphBuilder(HasTraits):
         
         # Add type information if type is not built-in.
         obj_type = obj.__class__
-        module = get_class_module(obj_type)
-        if not module == 'builtins':
-            data['module'] = module
+        module_name = get_class_module_name(obj_type)
+        if not module_name == 'builtins':
+            data['module'] = module_name
             data['qual_name'] = get_class_qual_name(obj_type)
 
         # Add object annotation, if it exists.

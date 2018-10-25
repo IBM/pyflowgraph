@@ -30,52 +30,66 @@ from .graphml import write_graphml
 from .remote_annotation_db import RemoteAnnotationDB
 
 
-def record_code(code, out=None, env=None, cwd=None, db=None,
-                simplify_outputs=True, **kwargs):
-    """ Evaluate and record Python code.
+def record_code(code, codename=None, out=None, env=None, cwd=None, db=None,
+                tracer=None, simplify_outputs=True, **kwargs):
+    """ Execute and record Python code.
 
     Parameters
     ----------
-    code : str or code object
+    code : str or ast.AST
         Python code to record
+    
+    codename : str (optional)
+        Name of file from which code was loaded, if any.
+        Passed to `compile`.
     
     out : str or file-like object (optional)
         Filename or file to which recorded flow graph is written (as GraphML)
     
     env : dict (optional)
-        Environment in which to evaluate code
+        Environment in which to execute code
 
     cwd : str (optional)
-        Current working directory in which to evaluate code
+        Current working directory in which to execute code
     
     db : AnnotationDB (optional)
         Annotation database, by default the standard remoate annotation DB
+    
+    tracer : Tracer (optional)
+        Execution tracer, which includes the object tracker
     
     simplify_outputs : bool (optional)
         Whether to simplify outputs when writing GraphML
 
     **kwargs
-        Extra arguments to pass to `FlowGraphBuilder`.
+        Extra arguments to pass to `FlowGraphBuilder`
     """
+    # Set up flow graph builder.
     db = db or RemoteAnnotationDB.from_library_config()
     builder = FlowGraphBuilder(**kwargs)
     builder.annotator.db = db
-    tracer = Tracer(modules=['__record__'])
 
-    # Evaluate the code with the right working directory, environment, and
-    # module name.
+    # Set up tracer.
+    def handle_trace_event(changed):
+        event = changed['new']
+        if event:
+            builder.push_event(event)
+    tracer = tracer or Tracer()
+
+    # Evaluate the code in the right working directory and environment.
     env = env or {}
-    env['__name__'] = '__record__'
     if cwd is not None:
         oldcwd = os.getcwd()
         os.chdir(cwd)
+    tracer.observe(handle_trace_event, 'event')
     try:
-        with Recorder(builder=builder, tracer=tracer) as graph:
-            exec(code, env)
+        tracer.trace(code, codename=codename, env=env)
     finally:
+        tracer.unobserve(handle_trace_event, 'event')
         if cwd is not None:
             os.chdir(oldcwd)
-    
+    graph = builder.graph
+
     if out is not None:
         graphml = flow_graph_to_graphml(graph, simplify_outputs=simplify_outputs)
         write_graphml(graphml, out)
@@ -84,51 +98,18 @@ def record_code(code, out=None, env=None, cwd=None, db=None,
 
 
 def record_script(filename, **kwargs):
-    """ Evaluate and record a Python script.
+    """ Execute and record a Python script.
 
     Parameters
     ----------
     filename : str
-        Filename of Python script to evaluate
+        Filename of Python script to execute
     
     **kwargs
-        Extra arguments to pass to `record_code`.
+        Extra arguments to pass to `record_code`
     """
-    # Read and compile the script.
+    # Read the script.
     with open(filename) as f:
-        code = compile(f.read(), filename, 'exec')
+        code = f.read()
     
-    return record_code(code, **kwargs)
-
-
-class Recorder(HasTraits):
-    """ Context manager to record flow graphs.
-
-    Like all context managers, this class should be used in a `with` statement::
-
-        with Recorder() as graph:
-            from sklearn.datasets import make_blobs
-            X, labels = make_blobs(n_samples=100, n_features=2, centers=3)
-
-    For most use cases, it is simpler to use `record_code` or `record_script`.
-    """
-    builder = Instance(FlowGraphBuilder)
-    tracer = Instance(Tracer)
-
-    # Context manager interface
-    
-    def __enter__(self):
-        self.tracer.observe(self._handle_trace_event, 'event')
-        self.tracer.enable()
-        return self.builder.graph
-        
-    def __exit__(self, type, value, traceback):
-        self.tracer.disable()
-        self.tracer.unobserve(self._handle_trace_event, 'event')
-
-    # Handlers
-
-    def _handle_trace_event(self, changed):
-        event = changed['new']
-        if event:
-            self.builder.push_event(event)
+    return record_code(code, codename=filename, **kwargs)

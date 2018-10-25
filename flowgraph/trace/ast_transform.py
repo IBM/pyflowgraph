@@ -18,6 +18,7 @@ from __future__ import absolute_import
 
 import ast
 from collections import OrderedDict
+import six
 import sys
 try:
     # Python 3.3+
@@ -63,7 +64,7 @@ def bind_arguments(fun, *args, **kwargs):
         # https://stackoverflow.com/q/42134927
         arguments = OrderedDict()
         for i, value in enumerate(args):
-            arguments['__arg%i__' % i] = value # Make up argument names.
+            arguments[str(i)] = value
         for key, value in kwargs.items():
             arguments[key] = value
         return arguments
@@ -87,7 +88,7 @@ class WrapCalls(ast.NodeTransformer):
 
     def __init__(self, wrapper):
         super(WrapCalls, self).__init__()
-        self.wrapper = wrapper
+        self.wrapper = to_name(wrapper)
     
     def visit_Call(self, call):
         self.generic_visit(call)
@@ -99,3 +100,16 @@ class WrapCalls(ast.NodeTransformer):
             new_call = ast.Call(self.wrapper, new_args, call.keywords,
                                 call.starargs, call.kwargs)
         return new_call
+
+
+def to_name(str_or_name, ctx=None):
+    """ Cast a string to a Name AST node. 
+    """
+    ctx = ctx or ast.Load()
+    if isinstance(str_or_name, six.string_types):
+        id = str_or_name
+    elif isinstance(str_or_name, ast.Name):
+        id = str_or_name.id
+    else:
+        raise TypeError("Argument must be a string or a Name AST node")
+    return ast.Name(id, ctx)
