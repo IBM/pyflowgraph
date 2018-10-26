@@ -52,28 +52,6 @@ def make_tracing_call_wrapper(on_call=None, on_return=None):
     return wrapper
 
 
-def bind_arguments(fun, *args, **kwargs):
-    """ Bind arguments to function or method.
-
-    Returns an ordered dictionary mapping argument names to values.
-    """
-    try:
-        sig = signature(fun)
-    except ValueError:
-        # Sigantures doesn't exist for certain builtin functions.
-        # https://stackoverflow.com/q/42134927
-        arguments = OrderedDict()
-        for i, value in enumerate(args):
-            arguments[str(i)] = value
-        for key, value in kwargs.items():
-            arguments[key] = value
-        return arguments
-    
-    # If we have a signature, use it to bind the arguments.
-    bound = sig.bind(*args, **kwargs)
-    return bound.arguments
-
-
 class WrapCalls(ast.NodeTransformer):
     """ Wrap all function and method calls in AST.
 
@@ -101,6 +79,90 @@ class WrapCalls(ast.NodeTransformer):
                                 call.starargs, call.kwargs)
         return new_call
 
+
+class AttributesToFunctions(ast.NodeTransformer):
+    """ Replace attribute getters/setters with function calls.
+
+    Namely, the functions `getattr`, `setattr`, and `delattr`.
+    """
+    
+    def visit_Attribute(self, node):
+        """ Convert attribute access to `getattr` call.
+        """
+        self.generic_visit(node)
+        if isinstance(node.ctx, ast.Load):
+            args = [ node.value, ast.Str(node.attr) ]
+            return to_call(to_name('getattr'), args)
+        return node
+    
+    def visit_Assign(self, node):
+        """ Convert assignment to attributes to `setattr` call.
+        """
+        self.generic_visit(node)
+        if len(node.targets) > 1:
+            # Multiple assignment not implemented.
+            return node
+        
+        target = node.targets[0]
+        if isinstance(target, ast.Name):
+            return node
+        elif isinstance(target, ast.Attribute):
+            args = [ target.value, ast.Str(target.attr), node.value ]
+            return ast.Expr(to_call(to_name('setattr'), args))
+
+        # Destructuring assignment not implemented.
+        return node
+        
+    def visit_Delete(self, node):
+        """ Convert `del` on attributes to `delattr` call.
+        """
+        self.generic_visit(node)
+        stmts = []
+        for target in node.targets:
+            if isinstance(target, ast.Attribute):
+                args = [ target.value, ast.Str(target.attr) ]
+                stmts.append(ast.Expr(to_call(to_name('delattr'), args)))
+            else:
+                stmts.append(ast.Delete([target]))
+        return stmts
+
+
+class OperatorsToFunctions(ast.NodeTransformer):
+    """ Replace unary, binary, and other operators with function calls.
+    """
+
+    def __init__(self, operator_module=None):
+        super(OperatorsToFunctions, self).__init__()
+        self.operator = to_name(operator_module or 'operator')
+
+
+# Helper functions
+
+def bind_arguments(fun, *args, **kwargs):
+    """ Bind arguments to function or method.
+
+    Returns an ordered dictionary mapping argument names to values.
+    """
+    try:
+        sig = signature(fun)
+    except ValueError:
+        # Sigantures doesn't exist for certain builtin functions.
+        # https://stackoverflow.com/q/42134927
+        arguments = OrderedDict()
+        for i, value in enumerate(args):
+            arguments[str(i)] = value
+        for key, value in kwargs.items():
+            arguments[key] = value
+        return arguments
+    
+    # If we have a signature, use it to bind the arguments.
+    bound = sig.bind(*args, **kwargs)
+    return bound.arguments
+
+def to_call(func, args=[], keywords=[], **kwargs):
+    """ Create Call AST node.
+    """
+    return ast.Call(func=func, args=args, keywords=[], **kwargs)
 
 def to_name(str_or_name, ctx=None):
     """ Cast a string to a Name AST node. 

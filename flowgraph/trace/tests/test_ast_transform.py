@@ -19,7 +19,10 @@ import six
 from textwrap import dedent
 import unittest
 
-from ..ast_transform import make_tracing_call_wrapper, WrapCalls
+from astor import to_source
+
+from ..ast_transform import make_tracing_call_wrapper, WrapCalls, \
+    AttributesToFunctions
 
 
 class TestASTTransform(unittest.TestCase):
@@ -85,6 +88,71 @@ class TestASTTransform(unittest.TestCase):
             ('call', 'sum', [('iterable' if six.PY3 else '0',range(5))]),
             ('return', 'sum', sum(range(5))),
         ])
+    
+    def test_simple_getattr(self):
+        """ Can we replace a simple attribute access with `getattr`?
+        """
+        node = ast.parse(dedent("""
+            x = obj.x
+            y = obj.y
+        """))
+        AttributesToFunctions().visit(node)
+        self.assertEqual(to_source(node), dedent("""\
+            x = getattr(obj, 'x')
+            y = getattr(obj, 'y')
+        """))
+    
+    def test_compound_getattr(self):
+        """ Can we replace a compound attribute access with `getattr`s?
+        """
+        node = ast.parse('x = container.obj.x')
+        AttributesToFunctions().visit(node)
+        self.assertEqual(to_source(node), dedent("""\
+            x = getattr(getattr(container, 'obj'), 'x')
+        """))
+    
+    def test_simple_setattr(self):
+        """ Can we replace a simple attribute assignment with `setattr`?
+        """
+        node = ast.parse(dedent("""
+            foo.x = 10
+            foo.y = 100
+        """))
+        AttributesToFunctions().visit(node)
+        self.assertEqual(to_source(node), dedent("""\
+            setattr(foo, 'x', 10)
+            setattr(foo, 'y', 100)
+        """))
+    
+    def test_compound_setattr(self):
+        """ Can we replace a compound attribute asssignment with `getattr` and
+        `setattr`?
+        """
+        node = ast.parse('container.foo.x = 10')
+        AttributesToFunctions().visit(node)
+        self.assertEqual(to_source(node), dedent("""\
+            setattr(getattr(container, 'foo'), 'x', 10)
+        """))
+    
+    def test_simple_delattr(self):
+        """ Can we replace a simple attribute deletion with `delattr`?
+        """
+        node = ast.parse('del foo.x')
+        AttributesToFunctions().visit(node)
+        self.assertEqual(to_source(node), dedent("""\
+            delattr(foo, 'x')
+        """))
+    
+    def test_multiple_delattr(self):
+        """ Can we replace a multiple deletion of attributes with `delattr`s?
+        """
+        node = ast.parse('del foo.x, other, foo.y')
+        AttributesToFunctions().visit(node)
+        self.assertEqual(to_source(node), dedent("""\
+            delattr(foo, 'x')
+            del other
+            delattr(foo, 'y')
+        """))
 
 
 if __name__ == '__main__':
