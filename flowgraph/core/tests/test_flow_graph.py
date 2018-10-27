@@ -470,11 +470,6 @@ class TestFlowGraph(unittest.TestCase):
                 'annotation': 'python/builtins/int',
                 'annotation_index': 2,
                 'value': 10,
-            }),
-            ('y', {
-                'argname': 'y',
-                'portkind': 'input',
-                'annotation_index': 3,
             })
         ])
         self.assertEqual(actual, desired)
@@ -501,17 +496,15 @@ class TestFlowGraph(unittest.TestCase):
                 'annotation': 'python/builtins/int',
                 'value': 2,
             }),
-            ('__vararg0__', {
-                'argname': '__vararg0__',
+            ('args', {
+                'argname': 'args',
                 'portkind': 'input',
-                'annotation': 'python/builtins/int',
-                'value': 3,
+                'value': (3,),
             }),
-            ('w', {
-                'argname': 'w',
+            ('kw', {
+                'argname': 'kw',
                 'portkind': 'input',
-                'annotation': 'python/builtins/int',
-                'value': 4,
+                'value': {'w': 4},
             })
         ])
         self.assertEqual(actual, desired)
@@ -624,7 +617,7 @@ class TestFlowGraph(unittest.TestCase):
         """ Test that capture of annotated object slots can be disabled.
         """
         actual = self.record("""
-            foo = objects.FooSlots(),
+            foo = objects.FooSlots()
         """, store_slots=False)
         
         target = new_flow_graph()

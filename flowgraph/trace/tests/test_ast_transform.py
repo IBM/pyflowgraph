@@ -68,7 +68,8 @@ class TestASTTransform(unittest.TestCase):
         self.assertEqual(history, [
             ('call', 'Fraction', [('numerator',3),('denominator',7)]),
             ('return', 'Fraction', Fraction(3,7)),
-            ('call', 'limit_denominator', [('max_denominator',2)]),
+            ('call', 'limit_denominator',
+             [('self',env['x']), ('max_denominator',2)]),
             ('return', 'limit_denominator', Fraction(1,2))
         ])
     

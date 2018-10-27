@@ -20,6 +20,7 @@ import ast
 from collections import OrderedDict
 import six
 import sys
+import types
 try:
     # Python 3.3+
     from inspect import signature
@@ -142,23 +143,41 @@ class OperatorsToFunctions(ast.NodeTransformer):
 def bind_arguments(fun, *args, **kwargs):
     """ Bind arguments to function or method.
 
-    Returns an ordered dictionary mapping argument names to values.
+    Returns an ordered dictionary mapping argument names to values. Unlike
+    `inspect.signature`, the `self` parameter of bound methods is included.
     """
+    if isinstance(fun, types.MethodType):
+        # Case 1: Bound method, implemented in Python.
+        # Reduce to Case 2 below because `Signature.bind()`` excludes `self`
+        # argument in bound methods.
+        args = (fun.__self__,) + args
+        fun = fun.__func__
+    
     try:
+        # Case 2: Callable implemented in Python.
         sig = signature(fun)
     except ValueError:
-        # Sigantures doesn't exist for certain builtin functions.
+        # `inspect.signature()` doesn't work on builtins.
         # https://stackoverflow.com/q/42134927
-        arguments = OrderedDict()
-        for i, value in enumerate(args):
-            arguments[str(i)] = value
-        for key, value in kwargs.items():
-            arguments[key] = value
-        return arguments
+        pass
+    else:
+        # Case 2, cont.: If we got a signature, use it and exit.
+        bound = sig.bind(*args, **kwargs)
+        return bound.arguments
     
-    # If we have a signature, use it to bind the arguments.
-    bound = sig.bind(*args, **kwargs)
-    return bound.arguments
+    fun_self = getattr(fun, '__self__', None)
+    if fun_self is not None and not isinstance(fun_self, types.ModuleType):
+        # Case 3: Method implemented in C ("builtin method").
+        # Reduce to Case 4 below.
+        args = (fun_self,) + args
+
+    # Case 4: Callable implemented in C ("builtin")
+    arguments = OrderedDict()
+    for i, value in enumerate(args):
+        arguments[str(i)] = value
+    for key, value in kwargs.items():
+        arguments[key] = value
+    return arguments
 
 def to_call(func, args=[], keywords=[], **kwargs):
     """ Create Call AST node.
