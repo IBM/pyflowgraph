@@ -49,7 +49,7 @@ class TestFlowGraph(unittest.TestCase):
     def record(self, code, env=None, **kwargs):
         """ Record block of code for test.
         """
-        self.env = env or {}
+        self.env = env if env is not None else {}
         self.env.update(dict(objects=objects))
         return record_code(dedent(code), db=self.db, tracer=self.tracer,
                            env=self.env, **kwargs)
@@ -311,14 +311,14 @@ class TestFlowGraph(unittest.TestCase):
         target = new_flow_graph()
         outputs = target.graph['output_node']
         target.add_node('1', qual_name='Foo')
-        target.add_node('x', qual_name='Foo.__getattribute__', slot='x')
-        target.add_node('y', qual_name='Foo.__getattribute__', slot='y')
+        target.add_node('x', qual_name='getattr', slot='x')
+        target.add_node('y', qual_name='getattr', slot='y')
         target.add_node('sum', qual_name='Foo.do_sum')
         target.add_node('prod', qual_name='Foo.do_prod')
         target.add_edge('1', 'x', id=self.id('foo'),
-                        sourceport='__return__', targetport='self')
+                        sourceport='__return__', targetport='0')
         target.add_edge('1', 'y', id=self.id('foo'),
-                        sourceport='__return__', targetport='self')
+                        sourceport='__return__', targetport='0')
         target.add_edge('1', 'sum', id=self.id('foo'),
                         sourceport='__return__', targetport='self')
         target.add_edge('1', 'prod', id=self.id('foo'),
@@ -532,7 +532,7 @@ class TestFlowGraph(unittest.TestCase):
                 'portkind': 'output',
                 'annotation': 'python/builtins/int',
                 'annotation_index': 1,
-                'value': x,
+                'value': self.env['x'],
             })
         ])
         self.assertEqual(actual, desired)
@@ -646,12 +646,12 @@ class TestFlowGraph(unittest.TestCase):
         target = new_flow_graph()
         outputs = target.graph['output_node']
         target.add_node('foo', qual_name='FooSlots')
-        target.add_node('x', qual_name='FooSlots.__getattribute__', slot='x')
-        target.add_node('y', qual_name='FooSlots.__getattribute__', slot='y')
+        target.add_node('x', qual_name='getattr', slot='x')
+        target.add_node('y', qual_name='getattr', slot='y')
         target.add_edge('foo', 'x', id=self.id('foo'),
-                        sourceport='__return__', targetport='self')
+                        sourceport='__return__', targetport='0')
         target.add_edge('foo', 'y', id=self.id('foo'),
-                        sourceport='__return__', targetport='self')
+                        sourceport='__return__', targetport='0')
         target.add_edge('foo', outputs, id=self.id('foo'), sourceport='__return__')
         self.assert_isomorphic(actual, target)
         

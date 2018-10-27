@@ -16,10 +16,12 @@ from __future__ import absolute_import
 
 import ast
 import six
+import types
 
 from traitlets import HasTraits, Bool, Dict, Instance, Int, List, Unicode
 
-from .ast_transform import WrapCalls, make_tracing_call_wrapper
+from .ast_transform import AttributesToFunctions, WrapCalls, \
+    make_tracing_call_wrapper
 from .inspect_names import get_func_module_name, get_func_qual_name
 from .object_tracker import ObjectTracker
 from .trace_event import TraceEvent, TraceCall, TraceReturn
@@ -58,12 +60,16 @@ class Tracer(HasTraits):
             Passed to `compile`.
         
         env : dict (optional)
-            Environment in which to execute code
+            Local environment in which to execute code
 
         Returns
         -------
-        Environment in which code was executed
+        Local environment in which code was executed
         """
+        # Reset state.
+        self.event = None
+        self.stack = []
+
         # Parse the code into AST.
         if isinstance(code_or_node, six.string_types):
             node = ast.parse(code_or_node)
@@ -74,22 +80,17 @@ class Tracer(HasTraits):
         else:
             raise TypeError("Code must be string or AST node")
 
-        # Run AST transformers.
-        WrapCalls('__trace__').visit(node)
+        # Run AST transformers and compile code.
+        node = self._transform_ast(node)
         ast.fix_missing_locations(node)
+        compiled = compile(node, filename=codename, mode='exec')
         
         # Execute the code in an appropriate environment.
-        self.event = None
-        self.stack = []
-        env = env or {}
-        env.update(dict(
-            __trace__ = make_tracing_call_wrapper(
-                on_call = self._on_function_call,
-                on_return = self._on_function_return,
-            ),
-        ))
-        exec(compile(node, filename=codename, mode='exec'), globals(), env)
-        return env
+        global_env = dict(globals())
+        global_env.update(self._prepare_env())
+        local_env = env if env is not None else {}
+        exec(compiled, global_env, local_env)
+        return local_env
     
     def track_object(self, obj):
         """ Start tracking an object.
@@ -97,6 +98,28 @@ class Tracer(HasTraits):
         return self.object_tracker.track(obj)
     
     # Protected interface
+
+    def _prepare_env(self):
+        """ Prepare the global environment in which code will be excecuted.
+        """
+        return dict(
+            __trace__ = make_tracing_call_wrapper(
+                on_call = self._on_function_call,
+                on_return = self._on_function_return,
+                filter_call = self._filter_call,
+            ),
+        )
+
+    def _transform_ast(self, node):
+        """ Transform AST to insert tracing machinery.
+        """
+        transformers = [
+            AttributesToFunctions(),
+            WrapCalls('__trace__'),
+        ]
+        for transformer in transformers:
+            transformer.visit(node)
+        return node
 
     def _on_function_call(self, func, arguments):
         """ Handle function calls during tracing.
@@ -135,3 +158,13 @@ class Tracer(HasTraits):
                                  module_name=call.module_name,
                                  qual_name=call.qual_name,
                                  arguments=arguments, return_value=return_value)
+    
+    def _filter_call(self, func, arguments):
+        """ Whether to emit trace events for function call (and return).
+        """
+        if func is getattr:
+            # Ignore attribute access on modules.
+            first = next(iter(arguments.values()))
+            return not isinstance(first, types.ModuleType)
+
+        return True

@@ -74,8 +74,10 @@ class ObjectTracker(HasTraits):
         `tuple`, `list`, and `dict` types. The latter fact is especially
         inconvenient.
         """
-        # We never track function objects, even though they are weakref-able.
-        if isinstance(obj, (types.FunctionType, types.MethodType)):
+        # We never track function, method, or module objects, even though they
+        # are weakref-able.
+        if isinstance(obj, (types.FunctionType, types.MethodType, 
+                            types.ModuleType)):
             return False
         
         # FIXME: Is there another way to check if an object is weakref-able?

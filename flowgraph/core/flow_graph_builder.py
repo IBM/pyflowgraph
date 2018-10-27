@@ -240,10 +240,10 @@ class FlowGraphBuilder(HasTraits):
         data = graph.nodes[node]
         
         # Handle special methods (unless overriden by annotation).
-        if event.name in ('__getattr__', '__getattribute__'):
+        if event.name == 'getattr':
             # If attribute is actually a bound method, remove the call node.
             # Method objects are not tracked and the method will be traced when
-            # it is called, so the getattr node is redundant and useless.
+            # it is called, so the `getattr` node is redundant and useless.
             if isinstance(event.return_value, types.MethodType):
                 graph.remove_node(node)
                 return False
@@ -278,7 +278,7 @@ class FlowGraphBuilder(HasTraits):
         return True
 
     def _update_getattr_node_for_return(self, event, node):
-        """ Update a `__getattr__` call node for a return event.
+        """ Update a `getattr` call node for a return event.
         """
         context = self._stack[-1]
         data = context.graph.nodes[node]

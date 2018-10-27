@@ -47,7 +47,7 @@ def record_code(code, codename=None, out=None, env=None, cwd=None, db=None,
         Filename or file to which recorded flow graph is written (as GraphML)
     
     env : dict (optional)
-        Environment in which to execute code
+        Local environment in which to execute code
 
     cwd : str (optional)
         Current working directory in which to execute code
@@ -77,7 +77,6 @@ def record_code(code, codename=None, out=None, env=None, cwd=None, db=None,
     tracer = tracer or Tracer()
 
     # Evaluate the code in the right working directory and environment.
-    env = env or {}
     if cwd is not None:
         oldcwd = os.getcwd()
         os.chdir(cwd)

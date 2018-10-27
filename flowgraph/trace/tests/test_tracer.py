@@ -61,8 +61,9 @@ class TestTracer(unittest.TestCase):
         self.assertEqual(event.function, objects.bar_from_foo)
         self.assertEqual(event.module_name, objects.__name__)
         self.assertEqual(event.qual_name, 'bar_from_foo')
-        self.assertEqual(event.arguments,
-                         OrderedDict([('foo',env['foo']), ('x',1), ('y',2)]))
+        self.assertEqual(event.arguments, OrderedDict([
+            ('foo',env['foo']), ('x',1), ('y',2)
+        ]))
         
         event = events[3]
         self.assertTrue(isinstance(event, TraceReturn))
@@ -125,8 +126,8 @@ class TestTracer(unittest.TestCase):
         
         events = self.events
         self.assertEqual(len(events), 8)
-        self.assertEqual(events[0].qual_name, 'Foo.__init__')
-        self.assertEqual(events[2].qual_name, 'Foo.__getattribute__')
+        self.assertEqual(events[0].qual_name, 'Foo')
+        self.assertEqual(events[2].qual_name, 'getattr')
         self.assertEqual(events[4].qual_name, 'Foo.apply')
         self.assertEqual(events[6].qual_name, 'baz_from_foo')
     
@@ -141,11 +142,14 @@ class TestTracer(unittest.TestCase):
         
         events = self.events
         self.assertEqual(len(events), 6)
-        self.assertEqual(events[0].qual_name, 'FooContainer.__init__')
-        self.assertEqual(events[2].qual_name, 'FooContainer.__getattribute__')
-        self.assertEqual(events[3].return_value, foo1)
-        self.assertEqual(events[4].qual_name, 'FooContainer.__getattribute__')
-        self.assertEqual(events[5].return_value, foo2)
+        self.assertEqual(events[0].qual_name, 'FooContainer')
+        self.assertEqual(events[2].qual_name, 'getattr')
+        self.assertEqual(events[2].arguments, OrderedDict([
+            ('0',env['container']), ('1','foo_property')
+        ]))
+        self.assertEqual(events[3].return_value, env['foo1'])
+        self.assertEqual(events[4].qual_name, 'getattr')
+        self.assertEqual(events[5].return_value, env['foo2'])
     
     def test_setattr(self):
         """ Are attribute setters traced?
@@ -157,9 +161,14 @@ class TestTracer(unittest.TestCase):
         
         events = self.events
         self.assertEqual(len(events), 6)
-        self.assertEqual(events[0].qual_name, 'FooContainer.__init__')
-        self.assertEqual(events[2].qual_name, 'Foo.__init__')
-        self.assertEqual(events[4].qual_name, 'FooContainer.__setattr__')
+        self.assertEqual(events[0].qual_name, 'FooContainer')
+        self.assertEqual(events[2].qual_name, 'Foo')
+        self.assertEqual(events[4].qual_name, 'setattr')
+        self.assertEqual(events[4].arguments, OrderedDict([
+            ('obj', env['container']),
+            ('name', 'foo'),
+            ('value', env['container'].foo),
+        ]))
 
 
 if __name__ == '__main__':

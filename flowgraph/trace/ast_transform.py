@@ -28,7 +28,7 @@ except ImportError:
     from funcsigs import signature
 
 
-def make_tracing_call_wrapper(on_call=None, on_return=None):
+def make_tracing_call_wrapper(on_call=None, on_return=None, filter_call=None):
     """ Higher-order function to create call wrappers for tracing.
 
     The wrapper calls the given functions before and/or after the wrapped
@@ -37,14 +37,15 @@ def make_tracing_call_wrapper(on_call=None, on_return=None):
     def wrapper(fun, *args, **kwargs):
         # Pre-call.
         arguments = bind_arguments(fun, *args, **kwargs)
-        if on_call is not None:
+        ok = filter_call is None or filter_call(fun, arguments)
+        if ok and on_call is not None:
             on_call(fun, arguments)
 
         # Call!
         return_value = fun(*args, **kwargs)
 
         # Post-call.
-        if on_return is not None:
+        if ok and on_return is not None:
             on_return(fun, arguments, return_value)
 
         return return_value
