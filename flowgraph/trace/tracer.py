@@ -20,8 +20,8 @@ import types
 
 from traitlets import HasTraits, Bool, Dict, Instance, Int, List, Unicode
 
-from .ast_transform import AttributesToFunctions, WrapCalls, \
-    make_tracing_call_wrapper
+from .ast_trace import  WrapCalls, make_tracing_call_wrapper
+from .ast_transform import AttributesToFunctions
 from .inspect_names import get_func_module_name, get_func_qual_name
 from .object_tracker import ObjectTracker
 from .trace_event import TraceEvent, TraceCall, TraceReturn
