@@ -20,7 +20,7 @@ import unittest
 
 from astor import to_source
 
-from ..ast_transform import AttributesToFunctions
+from ..ast_transform import AttributesToFunctions, OperatorsToFunctions
 
 
 class TestASTTransform(unittest.TestCase):
@@ -91,6 +91,28 @@ class TestASTTransform(unittest.TestCase):
             del other
             delattr(foo, 'y')
         """))
+    
+    def test_unary_op(self):
+        """ Can we replace unary operators with function calls?
+        """
+        node = ast.parse('-x')
+        OperatorsToFunctions().visit(node)
+        self.assertEqual(to_source(node).strip(), 'operator.neg(x)')
+
+        node = ast.parse('~x')
+        OperatorsToFunctions().visit(node)
+        self.assertEqual(to_source(node).strip(), 'operator.invert(x)')
+    
+    def test_binary_op(self):
+        """ Can we replace binary operators with function calls?
+        """
+        node = ast.parse('x+y')
+        OperatorsToFunctions().visit(node)
+        self.assertEqual(to_source(node).strip(), 'operator.add(x, y)')
+
+        node = ast.parse('x*y')
+        OperatorsToFunctions().visit(node)
+        self.assertEqual(to_source(node).strip(), 'operator.mul(x, y)')
 
 
 if __name__ == '__main__':

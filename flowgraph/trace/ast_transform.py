@@ -78,7 +78,21 @@ class OperatorsToFunctions(ast.NodeTransformer):
     def __init__(self, operator_module=None):
         super(OperatorsToFunctions, self).__init__()
         self.operator = to_name(operator_module or 'operator')
-
+    
+    def op_function(self, op):
+        """ Convert AST operator to function in operator module.
+        """
+        name = op.__class__.__name__.lower()
+        name = operator_table.get(name, name)
+        return ast.Attribute(value=self.operator, attr=name)
+    
+    def visit_UnaryOp(self, node):
+        self.generic_visit(node)
+        return to_call(self.op_function(node.op), [node.operand])
+    
+    def visit_BinOp(self, node):
+        self.generic_visit(node)
+        return to_call(self.op_function(node.op), [node.left, node.right])
 
 # Helper functions
 
@@ -98,3 +112,18 @@ def to_name(str_or_name, ctx=None):
     else:
         raise TypeError("Argument must be a string or a Name AST node")
     return ast.Name(id, ctx)
+
+# Operator table: map AST operator name -> function name in operator module
+# For whatever reason, the names are mostly but not quite consistent.
+
+operator_table = {
+    'not': 'not_',
+    'uadd': 'pos',
+    'usub': 'neg',
+    'bitand': 'and_',
+    'bitor': 'or_',
+    'bitxor': 'xor',
+    'div': 'truediv' if six.PY3 else 'div',
+    'mult': 'mul',
+    'matmult': 'matmul',
+}

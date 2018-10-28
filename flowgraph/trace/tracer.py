@@ -15,13 +15,14 @@
 from __future__ import absolute_import
 
 import ast
+import operator
 import six
 import types
 
 from traitlets import HasTraits, Bool, Dict, Instance, Int, List, Unicode
 
 from .ast_trace import  WrapCalls, make_tracing_call_wrapper
-from .ast_transform import AttributesToFunctions
+from .ast_transform import AttributesToFunctions, OperatorsToFunctions
 from .inspect_names import get_func_module_name, get_func_qual_name
 from .object_tracker import ObjectTracker
 from .trace_event import TraceEvent, TraceCall, TraceReturn
@@ -103,6 +104,7 @@ class Tracer(HasTraits):
         """ Prepare the global environment in which code will be excecuted.
         """
         return dict(
+            __operator__ = operator,
             __trace__ = make_tracing_call_wrapper(
                 on_call = self._on_function_call,
                 on_return = self._on_function_return,
@@ -115,6 +117,7 @@ class Tracer(HasTraits):
         """
         transformers = [
             AttributesToFunctions(),
+            OperatorsToFunctions('__operator__'),
             WrapCalls('__trace__'),
         ]
         for transformer in transformers:
