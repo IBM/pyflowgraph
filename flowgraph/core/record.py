@@ -47,7 +47,7 @@ def record_code(code, codename=None, out=None, env=None, cwd=None, db=None,
         Filename or file to which recorded flow graph is written (as GraphML)
     
     env : dict (optional)
-        Local environment in which to execute code
+        Environment in which to execute code
 
     cwd : str (optional)
         Current working directory in which to execute code

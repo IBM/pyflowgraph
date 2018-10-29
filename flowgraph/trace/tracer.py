@@ -62,7 +62,7 @@ class Tracer(HasTraits):
             Passed to `compile`.
         
         env : dict (optional)
-            Local environment in which to execute code
+            Environment in which to execute code
 
         Returns
         -------
@@ -87,12 +87,11 @@ class Tracer(HasTraits):
         ast.fix_missing_locations(node)
         compiled = compile(node, filename=codename, mode='exec')
         
-        # Execute the code in an appropriate environment.
-        global_env = dict(globals())
-        global_env.update(self._prepare_env())
-        local_env = env if env is not None else {}
-        exec(compiled, global_env, local_env)
-        return local_env
+        # Execute the code in the appropriate environment.
+        env = env if env is not None else {}
+        env.update(self._prepare_env())
+        exec(compiled, env)
+        return env
     
     def track_object(self, obj):
         """ Start tracking an object.
@@ -102,16 +101,18 @@ class Tracer(HasTraits):
     # Protected interface
 
     def _prepare_env(self):
-        """ Prepare the global environment in which code will be excecuted.
+        """ Prepare the environment in which code will be excecuted.
         """
-        return dict(
+        env = dict(globals())
+        env.update(dict(
             __operator__ = operator,
             __trace__ = make_tracing_call_wrapper(
                 on_call = self._on_function_call,
                 on_return = self._on_function_return,
                 filter_call = self._filter_call,
             ),
-        )
+        ))
+        return env
 
     def _transform_ast(self, node):
         """ Transform AST to insert tracing machinery.
@@ -132,7 +133,7 @@ class Tracer(HasTraits):
         # Inspect the function.
         module_name = get_func_module_name(func)
         qual_name = get_func_qual_name(func)
-        atomic = True
+        atomic = func.__module__ != self.__class__.__module__
             
         # Track every argument that is trackable.
         for arg in arguments.values():

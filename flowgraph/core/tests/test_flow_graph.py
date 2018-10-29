@@ -204,6 +204,10 @@ class TestFlowGraph(unittest.TestCase):
         """ Test that nested function calls are mapped to a nested subgraph.
         """
         actual = self.record("""
+            def outer_bar():
+                foo = objects.Foo()
+                return objects.bar_from_foo(foo)
+
             bar = outer_bar()
         """)
         
@@ -228,6 +232,10 @@ class TestFlowGraph(unittest.TestCase):
         """ Test that a singly nested function call can be flattened.
         """
         graph = self.record("""
+            def outer_bar():
+                foo = objects.Foo()
+                return objects.bar_from_foo(foo)
+
             bar = outer_bar()
         """)
         
@@ -244,6 +252,12 @@ class TestFlowGraph(unittest.TestCase):
         """ Test that doubly nested function calls are handled.
         """
         actual = self.record("""
+            def inner_bar_from_foo(foo):
+                return objects.bar_from_foo(foo)
+
+            def outer_bar_from_foo(foo):
+                return inner_bar_from_foo(foo)
+
             foo = objects.Foo()
             bar = outer_bar_from_foo(foo)
         """)
@@ -282,6 +296,12 @@ class TestFlowGraph(unittest.TestCase):
         """ Test that doubly nested function calls can be flattened.
         """
         graph = self.record("""
+            def inner_bar_from_foo(foo):
+                return objects.bar_from_foo(foo)
+
+            def outer_bar_from_foo(foo):
+                return inner_bar_from_foo(foo)
+
             foo = objects.Foo()
             bar = outer_bar_from_foo(foo)
         """)
@@ -845,19 +865,6 @@ class TestFlowGraph(unittest.TestCase):
             },
         ])
         self.assertEqual(outputs, { self.id('bar') })
-
-
-# Test data
-
-def outer_bar_from_foo(foo):
-    return inner_bar_from_foo(foo)
-    
-def inner_bar_from_foo(foo):
-    return objects.bar_from_foo(foo)
-
-def outer_bar():
-    foo = objects.Foo()
-    return objects.bar_from_foo(foo)
 
 
 if __name__ == '__main__':
