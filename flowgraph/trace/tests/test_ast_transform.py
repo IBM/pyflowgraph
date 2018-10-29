@@ -20,7 +20,8 @@ import unittest
 
 from astor import to_source
 
-from ..ast_transform import AttributesToFunctions, OperatorsToFunctions
+from ..ast_transform import AttributesToFunctions, IndexingToFunctions, \
+    OperatorsToFunctions
 
 
 class TestASTTransform(unittest.TestCase):
@@ -113,6 +114,48 @@ class TestASTTransform(unittest.TestCase):
         node = ast.parse('x*y')
         OperatorsToFunctions().visit(node)
         self.assertEqual(to_source(node).strip(), 'operator.mul(x, y)')
+    
+    def test_simple_getitem(self):
+        """ Can we replace a simple indexing operation with `getitem`?
+        """
+        node = ast.parse('x[0]')
+        IndexingToFunctions().visit(node)
+        self.assertEqual(to_source(node).strip(), 'operator.getitem(x, 0)')
+    
+    def test_slice_getitem(self):
+        """ Can we replace a slice indexing operation with `getitem`?
+        """
+        node = ast.parse('x[0:1]')
+        IndexingToFunctions().visit(node)
+        self.assertEqual(to_source(node).strip(),
+                         'operator.getitem(x, slice(0, 1))')
+        
+        node = ast.parse('x[::2]')
+        IndexingToFunctions().visit(node)
+        self.assertEqual(to_source(node).strip(),
+                         'operator.getitem(x, slice(None, None, 2))')
+    
+    def test_multidim_slice_getitem(self):
+        """ Can we replace a multidimensional slice with `getitem`?
+        """
+        node = ast.parse('x[:m, :n]')
+        IndexingToFunctions().visit(node)
+        self.assertEqual(to_source(node).strip(),
+                         'operator.getitem(x, (slice(m), slice(n)))')
+    
+    def test_simple_setitem(self):
+        """ Can we replace an indexed assignment with `setitem`?
+        """
+        node = ast.parse('x[0] = 1')
+        IndexingToFunctions().visit(node)
+        self.assertEqual(to_source(node).strip(), 'operator.setitem(x, 0, 1)')
+    
+    def test_simple_delitem(self):
+        """ Can we replace an indexed deletion with `delitem`?
+        """
+        node = ast.parse('del x[0]')
+        IndexingToFunctions().visit(node)
+        self.assertEqual(to_source(node).strip(), 'operator.delitem(x, 0)')
 
 
 if __name__ == '__main__':

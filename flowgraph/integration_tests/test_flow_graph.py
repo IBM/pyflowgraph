@@ -194,7 +194,7 @@ class IntegrationTestFlowGraph(unittest.TestCase):
         target.add_node('read', qual_name='_make_parser_function.<locals>.parser_f',
                         annotation='python/pandas/read-table')
         target.add_node('X', qual_name='DataFrame.drop')
-        target.add_node('y', qual_name='DataFrame.__getitem__')
+        target.add_node('y', qual_name='getitem')
         target.add_node('lm', qual_name='LinearRegression',
                         annotation='python/sklearn/linear-regression')
         target.add_node('fit', qual_name='LinearRegression.fit',
@@ -207,7 +207,7 @@ class IntegrationTestFlowGraph(unittest.TestCase):
                         annotation='python/sklearn/mean-squared-error')
         target.add_edge('read', 'X', sourceport='__return__', targetport='self',
                         annotation='python/pandas/data-frame')
-        target.add_edge('read', 'y', sourceport='__return__', targetport='self',
+        target.add_edge('read', 'y', sourceport='__return__', targetport='0',
                         annotation='python/pandas/data-frame')
         target.add_edge('lm', 'fit', sourceport='__return__', targetport='self',
                         annotation='python/sklearn/linear-regression')
