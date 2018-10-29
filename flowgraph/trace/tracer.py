@@ -23,7 +23,7 @@ from traitlets import HasTraits, Bool, Instance, List
 
 from .ast_trace import  WrapCalls, make_tracing_call_wrapper
 from .ast_transform import AttributesToFunctions, IndexingToFunctions, \
-    OperatorsToFunctions
+    InplaceOperatorsToFunctions, OperatorsToFunctions
 from .inspect_names import get_func_module_name, get_func_qual_name
 from .object_tracker import ObjectTracker
 from .trace_event import TraceEvent, TraceCall, TraceReturn
@@ -120,10 +120,12 @@ class Tracer(HasTraits):
     def _transform_ast(self, node):
         """ Transform AST to insert tracing machinery.
         """
+        operator_name = '__operator__'
         transformers = [
             AttributesToFunctions(),
-            IndexingToFunctions('__operator__'),
-            OperatorsToFunctions('__operator__'),
+            IndexingToFunctions(operator_name),
+            OperatorsToFunctions(operator_name),
+            InplaceOperatorsToFunctions(operator_name),
             WrapCalls('__trace__'),
         ]
         for transformer in transformers:

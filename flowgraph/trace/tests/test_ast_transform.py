@@ -21,7 +21,7 @@ import unittest
 from astor import to_source
 
 from ..ast_transform import AttributesToFunctions, IndexingToFunctions, \
-    OperatorsToFunctions
+    InplaceOperatorsToFunctions, OperatorsToFunctions
 
 
 class TestASTTransform(unittest.TestCase):
@@ -115,6 +115,17 @@ class TestASTTransform(unittest.TestCase):
         OperatorsToFunctions().visit(node)
         self.assertEqual(to_source(node).strip(), 'operator.mul(x, y)')
     
+    def test_inplace_binary_op(self):
+        """ Can we replace an inplace binary operation with an assignment?
+        """
+        node = ast.parse('x += 1')
+        InplaceOperatorsToFunctions().visit(node)
+        self.assertEqual(to_source(node).strip(), 'x = operator.iadd(x, 1)')
+
+        node = ast.parse('x *= y')
+        InplaceOperatorsToFunctions().visit(node)
+        self.assertEqual(to_source(node).strip(), 'x = operator.imul(x, y)')
+        
     def test_simple_getitem(self):
         """ Can we replace a simple indexing operation with `getitem`?
         """
@@ -156,6 +167,14 @@ class TestASTTransform(unittest.TestCase):
         node = ast.parse('del x[0]')
         IndexingToFunctions().visit(node)
         self.assertEqual(to_source(node).strip(), 'operator.delitem(x, 0)')
+    
+    def test_inplace_setitem(self):
+        """ Can we replace an inplace indexed binary op with function calls?
+        """
+        node = ast.parse('x[:n] += 1')
+        IndexingToFunctions().visit(node)
+        result = 'operator.setitem(x, slice(n), operator.iadd(operator.getitem(x, slice(n)), 1))'
+        self.assertEqual(to_source(node).strip(), result)
 
 
 if __name__ == '__main__':

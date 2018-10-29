@@ -21,6 +21,7 @@ operators, indexing, etc) to function calls.
 from __future__ import absolute_import
 
 import ast
+import copy
 import six
 import sys
 
@@ -74,6 +75,8 @@ class IndexingToFunctions(ast.NodeTransformer):
     def __init__(self, operator_module=None):
         super(IndexingToFunctions, self).__init__()
         self.operator = to_name(operator_module or 'operator')
+        self.op_to_function = InplaceOperatorsToFunctions(self.operator)\
+            .op_to_function
     
     def index_to_expr(self, index):
         """ Convert index (slice) to functional expression.
@@ -132,6 +135,55 @@ class IndexingToFunctions(ast.NodeTransformer):
             else:
                 stmts.append(ast.Delete([target]))
         return stmts
+    
+    def visit_AugAssign(self, node):
+        """ Convert indexed augmented assignment to `getitem`/`setitem` calls.
+
+        Example: `x[0] += 1` -> `setitem(x, 0, iadd(getitem(x, 0), 1)))`
+        """
+        # FIXME: Gensym the subscript value to avoid two evaluations.
+        self.generic_visit(node)
+        target = node.target
+        if isinstance(target, ast.Subscript):
+            index = self.index_to_expr(target.slice)
+            return to_call(to_attribute(self.operator, 'setitem'), [
+                target.value,
+                index,
+                to_call(self.op_to_function(node.op), [
+                    to_call(to_attribute(self.operator, 'getitem'), [
+                        target.value,
+                        index,
+                    ]),
+                    node.value
+                ])
+            ])
+        return node
+
+
+class InplaceOperatorsToFunctions(ast.NodeTransformer):
+    """ Replace inplace binary operators with assignment plus function call.
+    """
+
+    def __init__(self, operator_module=None):
+        super(InplaceOperatorsToFunctions, self).__init__()
+        self.operator = to_name(operator_module or 'operator')
+    
+    def op_to_function(self, op, inplace=False):
+        """ Convert AST operator to function in operator module.
+        """
+        name = op.__class__.__name__.lower()
+        return to_attribute(self.operator, inplace_operator_table[name])
+    
+    def visit_AugAssign(self, node):
+        """ Convert augmented assignment to assignment plus function call.
+
+        Example: `x += 1' -> `x = operator.iadd(x, 1)`
+        """
+        # FIXME: Gensym the LHS to avoid two evaluations.
+        self.generic_visit(node)
+        rhs = to_call(self.op_to_function(node.op),
+                      [set_ctx(node.target), node.value])
+        return ast.Assign([node.target], rhs)
 
 
 class OperatorsToFunctions(ast.NodeTransformer):
@@ -150,10 +202,18 @@ class OperatorsToFunctions(ast.NodeTransformer):
         return to_attribute(self.operator, name)
     
     def visit_UnaryOp(self, node):
+        """ Convert unary operator to function call.
+
+        Example: `-x` -> `operator.neg(x)`
+        """
         self.generic_visit(node)
         return to_call(self.op_to_function(node.op), [node.operand])
     
     def visit_BinOp(self, node):
+        """ Convert binary operator to function call.
+
+        Example: `x+y` -> `operator.add(x,y)`
+        """
         self.generic_visit(node)
         return to_call(self.op_to_function(node.op), [node.left, node.right])
 
@@ -194,6 +254,14 @@ def to_name_constant(value):
     else:
         return to_name(str(value))
 
+def set_ctx(node, ctx=None):
+    """ Replace AST context without mutation.
+    """
+    node = copy.copy(node)
+    node.ctx = ctx or ast.Load()
+    return node
+
+
 # Operator table: map AST operator name -> function name in operator module
 # For whatever reason, the names are mostly but not quite consistent.
 
@@ -204,7 +272,23 @@ operator_table = {
     'bitand': 'and_',
     'bitor': 'or_',
     'bitxor': 'xor',
-    'div': 'truediv' if six.PY3 else 'div',
     'mult': 'mul',
     'matmult': 'matmul',
+    'div': 'truediv' if six.PY3 else 'div',
+}
+
+inplace_operator_table = {
+    'add': 'iadd',
+    'sub': 'isub',
+    'mult': 'imul',
+    'matmult': 'imatmul',
+    'div': 'itruediv' if six.PY3 else 'idiv',
+    'floordiv': 'ifloordiv',
+    'mod': 'imod',
+    'pow': 'ipow',
+    'bitand': 'iand',
+    'bitor': 'ior',
+    'bitxor': 'ixor',
+    'lshift': 'ilshift',
+    'rshift': 'irshift',
 }
