@@ -136,7 +136,7 @@ class Tracer(HasTraits):
         # Inspect the function.
         module_name = get_func_module_name(func)
         qual_name = get_func_qual_name(func)
-        atomic = func.__module__ != self.__class__.__module__
+        atomic = module_name != self.__class__.__module__
             
         # Track every argument that is trackable.
         for arg in arguments.values():

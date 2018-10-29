@@ -18,6 +18,11 @@ import inspect
 import unittest
 import sys
 
+try:
+    import numpy as np
+except ImportError:
+    np = None
+
 from flowgraph.core.tests import objects
 from ..inspect_names import *
 
@@ -76,6 +81,22 @@ class TestInspectNames(unittest.TestCase):
         full_name = objects.__name__ + '.create_foo'
         self.assertEqual(get_func_full_name(objects.create_foo), full_name)
         self.assertEqual(get_class_full_name(map), 'map')
+    
+    @unittest.skipIf(np is None, "requires numpy")
+    def test_get_numpy_builtin_method_names(self):
+        """ Can get the module and qual name of a numpy builtin method?
+        """
+        # Note: `numpy.random.rand` is a method bound to `mtrand.RandomState`.
+        # Try running `import numpy, mtrand`.
+        self.assertEqual(get_func_module_name(np.random.rand), 'mtrand')
+        self.assertEqual(get_func_qual_name(np.random.rand), 'RandomState.rand')
+    
+    @unittest.skipIf(np is None, "requires numpy")
+    def test_get_ufunc_names(self):
+        """ Can we get the module and qual name of a numpy ufunc?
+        """
+        self.assertEqual(get_func_module_name(np.sin), 'numpy')
+        self.assertEqual(get_func_qual_name(np.sin), 'sin')
 
 
 # Test data

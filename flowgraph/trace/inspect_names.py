@@ -17,6 +17,9 @@
 import sys
 import types
 
+function_types = (types.LambdaType, types.FunctionType, types.MethodType,
+                  types.BuiltinFunctionType, types.BuiltinMethodType)
+
 
 def get_class_module_name(typ):
     """ Get name of module in which type was defined.
@@ -47,33 +50,50 @@ def get_class_full_name(typ):
 def get_func_module_name(func):
     """ Get name of module in which the function object was defined.
     """
-    return _fix_module_name(func.__module__)
+    # Typical case: callable object with non-null `__module__` attribute.
+    module_name = getattr(func, '__module__', None)
+    if module_name is not None:
+        return _fix_module_name(module_name)
+
+    # Special case: non-function callable object (e.g., a `numpy.ufunc`).
+    # Defer to object's class.
+    if not isinstance(func, function_types):
+        return get_class_module_name(func.__class__)
+
+    # Special case: function object with null `__module__` attribute, e.g.,
+    # builtin methods like `numpy.random.rand`. Defer to bound instance.
+    func_self = getattr(func, '__self__', None)
+    if func_self is not None:
+        return get_class_module_name(func_self.__class__)
+
 
 def get_func_qual_name(func):
     """ Get the qualified name of a function object.
     
     See PEP 3155: "Qualified name for classes and functions"
     """
-    # Python 2 implementation
-    if sys.version_info[0] == 2:
-        name = func.__name__
-        if isinstance(func, types.MethodType):
-            if type(func.im_self) is type(object):
-                # Case 1: class method
-                return func.im_self.__name__ + '.' + name
-            else:
-                # Case 2: instance method
-                return func.im_class.__name__ + '.' + name
-        else:
-            # Case 3: ordinary function
-            return name
-    
-    # Python 3 implementation
-    elif sys.version_info[0] >= 3 and sys.version_info[1] >= 3:
+    try:
+        # Typical case for Python 3.3+.
         return func.__qualname__
     
-    else:
-        raise NotImplementedError("Only implemented for Python 2 and 3.3+")
+    except AttributeError:
+        # Typical case for Python 2.7. Also, for certain function-like objects
+        # that do not have qual names, like numpy ufuncs:
+        # https://github.com/numpy/numpy/issues/4952
+
+        # If a class method or instance method, fish out the class manually.
+        func_self = getattr(func, '__self__', None)
+        if isinstance(func, function_types) and func_self is not None:
+            if type(func_self) is type(object):
+                # Class method
+                return func_self.__name__ + '.' + func.__name__
+            else:
+                # Instance method
+                return type(func_self).__name__ + '.' + func.__name__
+    
+        # Give up and return `__name__`.
+        return func.__name__
+
 
 def get_func_full_name(func):
     """ Get the full name of a function object.
