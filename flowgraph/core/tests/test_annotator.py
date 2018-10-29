@@ -71,6 +71,12 @@ class TestAnnotator(unittest.TestCase):
         self.assertEqual(note['id'], 'int')
         self.assertEqual(self.annotator.notate_object(None), None)
     
+    def test_object_constructor(self):
+        """ Can we annotate an object constructor as a function?
+        """
+        note = self.annotator.notate_function(objects.Empty)
+        self.assertEqual(note['id'], 'new-empty')
+    
     def test_object_precedence(self):
         """ Can we notate an object with mulitple class matches using the
         precedence rules?

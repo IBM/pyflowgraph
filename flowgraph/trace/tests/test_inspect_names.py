@@ -18,19 +18,24 @@ import inspect
 import unittest
 import sys
 
+try:
+    import numpy as np
+except ImportError:
+    np = None
+
 from flowgraph.core.tests import objects
-from ..frame_util import *
+from ..inspect_names import *
 
 
-class TestFrameUtil(unittest.TestCase):
-    """ Test cases for frame utility functions.
+class TestInspectNames(unittest.TestCase):
+    """ Test cases for inspecting names of classes and functions.
     """
     
-    def test_get_class_module(self):
+    def test_get_class_module_name(self):
         """ Can we get the module in which a class is defined?
         """
         module = objects.__name__
-        self.assertEqual(get_class_module(objects.Foo), module)
+        self.assertEqual(get_class_module_name(objects.Foo), module)
     
     def test_get_class_qual_name(self):
         """ Can we get the qualified name of a class?
@@ -46,13 +51,14 @@ class TestFrameUtil(unittest.TestCase):
         self.assertEqual(get_class_full_name(objects.Foo), full_name)
         self.assertEqual(get_class_full_name(str), 'str')
     
-    def test_get_func_module(self):
+    def test_get_func_module_name(self):
         """ Can we get the module in which a function object is defined?
         """
         module = objects.__name__
-        self.assertEqual(get_func_module(objects.create_foo), module)
-        self.assertEqual(get_func_module(objects.Foo.do_sum), module)
-        self.assertEqual(get_func_module(objects.Foo().do_sum), module)
+        self.assertEqual(get_func_module_name(objects.create_foo), module)
+        self.assertEqual(get_func_module_name(objects.Foo), module)
+        self.assertEqual(get_func_module_name(objects.Foo.do_sum), module)
+        self.assertEqual(get_func_module_name(objects.Foo().do_sum), module)
     
     def test_get_func_qual_name(self):
         """ Can we get the qualified name of a function object?
@@ -61,6 +67,7 @@ class TestFrameUtil(unittest.TestCase):
             self.assertEqual(get_func_qual_name(func), name)
         
         assert_qual_name(toplevel, 'toplevel')
+        assert_qual_name(Toplevel, 'Toplevel')
         assert_qual_name(Toplevel().f, 'Toplevel.f')
         assert_qual_name(Toplevel.f_cls, 'Toplevel.f_cls')
         if sys.version_info[0] >= 3:
@@ -75,32 +82,21 @@ class TestFrameUtil(unittest.TestCase):
         self.assertEqual(get_func_full_name(objects.create_foo), full_name)
         self.assertEqual(get_class_full_name(map), 'map')
     
-    def test_get_frame_module(self):
-        """ Can we get the name of this module from a frame?
+    @unittest.skipIf(np is None, "requires numpy")
+    def test_get_numpy_builtin_method_names(self):
+        """ Can get the module and qual name of a numpy builtin method?
         """
-        self.assertEqual(get_frame_module(inspect.currentframe()),
-                         'flowgraph.trace.tests.test_frame_util')
+        # Note: `numpy.random.rand` is a method bound to `mtrand.RandomState`.
+        # Try running `import numpy, mtrand`.
+        self.assertEqual(get_func_module_name(np.random.rand), 'mtrand')
+        self.assertEqual(get_func_qual_name(np.random.rand), 'RandomState.rand')
     
-    def test_get_frame_func(self):
-        """ Can we get the function object from a frame?
+    @unittest.skipIf(np is None, "requires numpy")
+    def test_get_ufunc_names(self):
+        """ Can we get the module and qual name of a numpy ufunc?
         """
-        def assert_frame_func(frame, name):
-            self.assertTrue(inspect.isframe(frame))
-            self.assertEqual(get_frame_func(frame), name)
-        
-        assert_frame_func(toplevel(), toplevel)
-        assert_frame_func(lambda_f(), lambda_f)
-        
-        inner = nested()
-        assert_frame_func(inner(), inner)
-        
-        top = Toplevel()
-        assert_frame_func(top.f(), top.f)
-        assert_frame_func(Toplevel.f_cls(), Toplevel.f_cls)
-        assert_frame_func(Toplevel().f_static(), Toplevel.f_static)
-        
-        inner = Nested()()
-        assert_frame_func(inner.g(), inner.g)
+        self.assertEqual(get_func_module_name(np.sin), 'numpy')
+        self.assertEqual(get_func_qual_name(np.sin), 'sin')
 
 
 # Test data

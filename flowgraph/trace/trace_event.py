@@ -31,7 +31,7 @@ class TraceEvent(HasTraits):
     
     # Name of module containing the definition of the called function.
     # E.g., 'collections' or 'flowgraph.userlib.data.read_data'.
-    module = Unicode()
+    module_name = Unicode()
     
     # Qualified name of the called function.
     # E.g., 'map' or 'OrderedDict.__init__'.
@@ -50,7 +50,7 @@ class TraceEvent(HasTraits):
     def full_name(self):
         """ Full name of the called function.
         """
-        return self.module + '.' + self.qual_name
+        return self.module_name + '.' + self.qual_name
 
 
 class TraceCall(TraceEvent):

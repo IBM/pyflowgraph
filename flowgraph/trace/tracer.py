@@ -14,13 +14,17 @@
 
 from __future__ import absolute_import
 
-import sys
+import ast
+import operator
+import six
+import types
 
-from traitlets import HasTraits, Bool, Dict, Instance, Int, List, Unicode
+from traitlets import HasTraits, Bool, Instance, List
 
-from .attribute_tracer import AttributeTracer
-from .frame_util import get_frame_module, get_frame_func, get_frame_arguments,\
-    get_func_module, get_func_qual_name
+from .ast_trace import  WrapCalls, make_tracing_call_wrapper
+from .ast_transform import AttributesToFunctions, IndexingToFunctions, \
+    OperatorsToFunctions
+from .inspect_names import get_func_module_name, get_func_qual_name
 from .object_tracker import ObjectTracker
 from .trace_event import TraceEvent, TraceCall, TraceReturn
 
@@ -28,9 +32,9 @@ from .trace_event import TraceEvent, TraceCall, TraceReturn
 class Tracer(HasTraits):
     """ Execution tracer for Python.
     
-    This class provides a user-friendly wrapper around the system trace 
-    function (see `sys.settrace`). Its outputs (trace events) are consumed by
-    the flow graph builder.
+    The tracer executes Python code and emits trace events as the code runs.
+    The trace events are consumed by the flow graph builder to create flow
+    graphs.
     """
     
     # The most recent trace event. Read-only.
@@ -40,147 +44,142 @@ class Tracer(HasTraits):
     # The trace call event stack. Read-only.
     stack = List(Instance(TraceCall))
     
-    # Only function calls made in these modules will be traced.
-    # (The function itself can be defined in other modules.)
-    modules = List(Unicode(), ['__main__'])
-    
-    # Controls the tracing of attribute getters and setters.
-    # If this is disabled, whether attribute accesses are traced will depend
-    # on implementation details of the object, such as whether the attribute
-    # is a @property or, more generally, invokes Python-level code.
-    attribute_tracer = Instance(AttributeTracer, args=(), allow_none=True)
-    
     # Tracks objects using weak references.
     object_tracker = Instance(ObjectTracker, args=())
+
+    # Whether an atomic function is currently being called.
+    _in_atomic = Bool(False)
     
     # Tracer interface
 
-    def enable(self):
-        """ Enable the tracer.
+    def trace(self, code_or_node, codename=None, env=None):
+        """ Execute and trace Python code.
+
+        Parameters
+        ----------
+        code_or_node : str or ast.AST
+            Python code to record
         
-        Warning: this disables any other trace function that may be enabled,
-        such as a debugger or profiler.
+        codename : str (optional)
+            Name of file from which code was loaded, if any.
+            Passed to `compile`.
+        
+        env : dict (optional)
+            Environment in which to execute code
+
+        Returns
+        -------
+        Local environment in which code was executed
         """
+        # Reset state.
         self.event = None
         self.stack = []
-        sys.settrace(self._trace_function)
-    
-    def disable(self):
-        """ Disable the tracer.
-        """
-        sys.settrace(None)
+
+        # Parse the code into AST.
+        if isinstance(code_or_node, six.string_types):
+            node = ast.parse(code_or_node)
+            codename = codename or '<string>'
+        elif isinstance(code_or_node, ast.AST):
+            node = code_or_node
+            codename = codename or '<ast>'
+        else:
+            raise TypeError("Code must be string or AST node")
+
+        # Run AST transformers and compile code.
+        node = self._transform_ast(node)
+        ast.fix_missing_locations(node)
+        compiled = compile(node, filename=codename, mode='exec')
+        
+        # Execute the code in the appropriate environment.
+        env = env if env is not None else {}
+        env.update(self._prepare_env())
+        exec(compiled, env)
+        return env
     
     def track_object(self, obj):
         """ Start tracking an object.
         """
-        if self.attribute_tracer:
-            self.attribute_tracer.install(obj)
         return self.object_tracker.track(obj)
-    
-    # Context manager interface
-    
-    def __enter__(self):
-        self.enable()
-        
-    def __exit__(self, type, value, traceback):
-        self.disable()
     
     # Protected interface
 
-    def _trace_function(self, frame, event, arg):
-        """ Official trace function called by Python interpreter.
+    def _prepare_env(self):
+        """ Prepare the environment in which code will be excecuted.
         """
-        if event != 'call':
-            return
-        
-        # If we're inside an atomic function call, abort immediately.
-        # See `TestTracer.test_atomic_higher_order_call` and
-        #     `TestFlowGraphBuilder.test_higher_order_function`
-        # for cases where this makes a difference.
-        if self.stack and self.stack[-1].atomic:
-            return
-        
-        # Make sure the function has been called from a white-listed module.
-        if get_frame_module(frame.f_back) not in self.modules:
-            return
-        
-        # Get the function object for called function.
-        try:
-            # Multiple matches can occur for dynamically created functions,
-            # but we treat them as interchangeable.
-            func = get_frame_func(frame, raise_on_ambiguous=False)
-        except ValueError:
-            # It is possible for `get_frame_func` to fail. If so, just exit.
-            # FIXME: Log this failure?
-            return
-        
-        # One last filter before dispatching the event.
-        module, qual_name = get_func_module(func), get_func_qual_name(func)
-        atomic = module not in self.modules
-        if not self._trace_filter(module, qual_name):
-            return
+        env = dict(globals())
+        env.update(dict(
+            __operator__ = operator,
+            __trace__ = make_tracing_call_wrapper(
+                on_call = self._on_function_call,
+                on_return = self._on_function_return,
+                filter_call = self._filter_call,
+            ),
+        ))
+        return env
+
+    def _transform_ast(self, node):
+        """ Transform AST to insert tracing machinery.
+        """
+        transformers = [
+            AttributesToFunctions(),
+            IndexingToFunctions('__operator__'),
+            OperatorsToFunctions('__operator__'),
+            WrapCalls('__trace__'),
+        ]
+        for transformer in transformers:
+            transformer.visit(node)
+        return node
+
+    def _on_function_call(self, func, arguments):
+        """ Handle function calls during tracing.
+        """
+        # Inspect the function.
+        module_name = get_func_module_name(func)
+        qual_name = get_func_qual_name(func)
+        atomic = module_name != self.__class__.__module__
             
         # Track every argument that is trackable.
-        args = get_frame_arguments(frame)
-        for arg in args.values():
+        for arg in arguments.values():
             if self.object_tracker.is_trackable(arg):
                 self.track_object(arg)
         
         # Push the call event.
         self.event = TraceCall(tracer=self, function=func, atomic=atomic,
-                               module=module, qual_name=qual_name,
-                               arguments=args)
+                               module_name=module_name, qual_name=qual_name,
+                               arguments=arguments)
         self.stack.append(self.event)
-        
-        # Return a local trace function to handle the 'return' event.
-        
-        def local_trace_function(frame, event, value):
-            if event != 'return':
-                return
-            
-            # Track the return value(s), if possible.
-            if isinstance(value, tuple):
-                for subvalue in value:
-                    if self.object_tracker.is_trackable(subvalue):
-                        self.track_object(subvalue)
-            elif self.object_tracker.is_trackable(value):
-                self.track_object(value)
-            
-            # Create a return event and pop the corresponding call event.
-            self.event = TraceReturn(tracer=self, function=func, atomic=atomic,
-                                     module=module, qual_name=qual_name,
-                                     arguments=args, return_value=value)
-            self.stack.pop()
-        
-        return local_trace_function
+        self._in_atomic = atomic
     
-    def _trace_filter(self, module, qual_name):
-        """ Whether to trace a call to the given function.
-        """        
-        # Don't trace calls to hidden modules in Python implementation.
-        # A common appearance here is `_frozen_importlib`.
-        if module.startswith('_'):
+    def _on_function_return(self, func, arguments, return_value):
+        """ Handle function returns during tracing.
+        """
+         # Track the return value(s), if possible.
+        if isinstance(return_value, tuple):
+            # Treat tuple return value as multiple return values.
+            for value in return_value:
+                if self.object_tracker.is_trackable(value):
+                    self.track_object(value)
+        elif self.object_tracker.is_trackable(return_value):
+            self.track_object(return_value)
+
+        # Pop the corresponding call event and set return event.
+        call = self.stack.pop()
+        self.event = TraceReturn(tracer=self, function=func, atomic=call.atomic,
+                                 module_name=call.module_name,
+                                 qual_name=call.qual_name,
+                                 arguments=arguments, return_value=return_value)
+        self._in_atomic = False
+    
+    def _filter_call(self, func, arguments):
+        """ Whether to emit trace events for function call (and return).
+        """
+        if self._in_atomic:
+            # Ignore all further calls when an atomic function is executing.
             return False
-        
-        # No interference from this package.
-        # Calls that can be picked up include:
-        #   - Recorder.__exit__
-        #   - Tracer.__exit__
-        #   - Garbage collection callback from ObjectTracker
-        if module.startswith('flowgraph') and not 'tests' in module:
-            return False
-        
-        # The final test is an explicit blacklist of functions to ignore. 
-        if qual_name in trace_blacklist:
-            return False
-        
-        # By default, trace the function.
+
+        if func is getattr:
+            # Ignore attribute access on modules.
+            first = next(iter(arguments.values()))
+            return not isinstance(first, types.ModuleType)
+
         return True
-
-
-trace_blacklist = set([
-    # Python 2 only: extensions of import system due to `pkg_resources` and
-    # `six` packages.
-    '_SixMetaPathImporter.find_module',
-    'VendorImporter.find_module',
-])

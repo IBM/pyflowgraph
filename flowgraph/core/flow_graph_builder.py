@@ -24,7 +24,8 @@ import networkx as nx
 from traitlets import HasTraits, Bool, Dict, Instance, List, Unicode, default
 
 from flowgraph.kernel.slots import get_slot
-from flowgraph.trace.frame_util import get_class_module, get_class_qual_name
+from flowgraph.trace.inspect_names import get_class_module_name, \
+    get_class_qual_name
 from flowgraph.trace.object_tracker import ObjectTracker
 from flowgraph.trace.trace_event import TraceEvent, TraceCall, TraceReturn
 from .annotator import Annotator
@@ -61,7 +62,8 @@ class FlowGraphBuilder(HasTraits):
     def graph(self):
         """ Top-level flow graph.
         """
-        return self._stack[0].graph
+        # Make a shallow copy.
+        return nx.MultiDiGraph(self._stack[0].graph)
     
     def push_event(self, event):
         """ Push a new TraceEvent to the builder.
@@ -128,7 +130,7 @@ class FlowGraphBuilder(HasTraits):
         """
         # Special case: certain methods are never pure.
         func_name = event.qual_name.split('.')[-1]
-        mutating_methods = ('__init__', '__setattr__', '__setitem__')
+        mutating_methods = ('__setattr__', '__setitem__')
         if func_name in mutating_methods and arg_name == 'self':
             return False
         
@@ -213,7 +215,7 @@ class FlowGraphBuilder(HasTraits):
         graph = context.graph
         node = self._node_name(event.qual_name)
         data = {
-            'module': event.module,
+            'module': event.module_name,
             'qual_name': event.qual_name,
             'ports': self._get_ports_data(
                 event,
@@ -238,10 +240,10 @@ class FlowGraphBuilder(HasTraits):
         data = graph.nodes[node]
         
         # Handle special methods (unless overriden by annotation).
-        if event.name in ('__getattr__', '__getattribute__'):
+        if event.name == 'getattr':
             # If attribute is actually a bound method, remove the call node.
             # Method objects are not tracked and the method will be traced when
-            # it is called, so the getattr node is redundant and useless.
+            # it is called, so the `getattr` node is redundant and useless.
             if isinstance(event.return_value, types.MethodType):
                 graph.remove_node(node)
                 return False
@@ -249,9 +251,9 @@ class FlowGraphBuilder(HasTraits):
             elif not annotation:
                 self._update_getattr_node_for_return(event, node)
         
-        elif event.name == '__init__' and not annotation:
+        elif isinstance(event.function, type) and not annotation:
             # Record the object initializer as a constructor.
-            self._update_init_node_for_return(event, node)
+            self._update_constructor_node_for_return(event, node)
         
         # Add output ports.
         port_names = []
@@ -276,7 +278,7 @@ class FlowGraphBuilder(HasTraits):
         return True
 
     def _update_getattr_node_for_return(self, event, node):
-        """ Update a `__getattr__` call node for a return event.
+        """ Update a `getattr` call node for a return event.
         """
         context = self._stack[-1]
         data = context.graph.nodes[node]
@@ -297,14 +299,12 @@ class FlowGraphBuilder(HasTraits):
         else:
             data['slot'] = name
     
-    def _update_init_node_for_return(self, event, node):
-        """ Update an `__init__` call node for a return event.
+    def _update_constructor_node_for_return(self, event, node):
+        """ Update an object constructor call node for a return event.
         """
         context = self._stack[-1]
         data = context.graph.nodes[node]
-        
-        obj = list(event.arguments.values())[0]
-        note = self.annotator.notate_object(obj)
+        note = self.annotator.notate_object(event.return_value)
         if note:
             data.update({
                 'annotation': self._annotation_key(note),
@@ -477,9 +477,9 @@ class FlowGraphBuilder(HasTraits):
         
         # Add type information if type is not built-in.
         obj_type = obj.__class__
-        module = get_class_module(obj_type)
-        if not module == 'builtins':
-            data['module'] = module
+        module_name = get_class_module_name(obj_type)
+        if not module_name == 'builtins':
+            data['module'] = module_name
             data['qual_name'] = get_class_qual_name(obj_type)
 
         # Add object annotation, if it exists.
