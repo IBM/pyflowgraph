@@ -22,6 +22,7 @@ from __future__ import absolute_import
 
 import ast
 import six
+import sys
 
 
 class AttributesToFunctions(ast.NodeTransformer):
@@ -86,7 +87,7 @@ class IndexingToFunctions(ast.NodeTransformer):
                 args = [ index.lower, index.upper ]
             else:
                 args = [ index.lower, index.upper, index.step ]
-            args = [ ast.NameConstant(None) if arg is None else arg
+            args = [ to_name_constant(None) if arg is None else arg
                      for arg in args ]
             return to_call(to_name('slice'), args)
         elif isinstance(index, ast.ExtSlice):
@@ -159,10 +160,14 @@ class OperatorsToFunctions(ast.NodeTransformer):
 
 # Helper functions
 
-def to_call(func, args=[], keywords=[], **kwargs):
+def to_call(func, args=[], keywords=[]):
     """ Create a Call AST node.
     """
-    return ast.Call(func=func, args=args, keywords=[], **kwargs)
+    if sys.version_info.major >= 3 and sys.version_info.minor >= 5:
+        # Representation of *args and **kwargs changed in Python 3.5.
+        return ast.Call(func, args, keywords)
+    else:
+        return ast.Call(func, args, keywords, None, None)
 
 def to_attribute(value, attr, ctx=None):
     """ Create an Attribute AST node.
@@ -179,6 +184,15 @@ def to_name(str_or_name, ctx=None):
     else:
         raise TypeError("Argument must be a string or a Name AST node")
     return ast.Name(id, ctx or ast.Load())
+
+def to_name_constant(value):
+    """ Create a NameConstant AST node from a constant (True, False, None).
+    """
+    if sys.version_info.major >= 3 and sys.version_info.minor >= 4:
+        # NameConstant AST node new in Python 3.4.
+        return ast.NameConstant(value)
+    else:
+        return to_name(str(value))
 
 # Operator table: map AST operator name -> function name in operator module
 # For whatever reason, the names are mostly but not quite consistent.

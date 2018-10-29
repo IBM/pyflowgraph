@@ -15,6 +15,7 @@
 from __future__ import absolute_import
 
 from collections import OrderedDict
+import six
 from textwrap import dedent
 import unittest
 
@@ -165,9 +166,9 @@ class TestTracer(unittest.TestCase):
         self.assertEqual(events[2].qual_name, 'Foo')
         self.assertEqual(events[4].qual_name, 'setattr')
         self.assertEqual(events[4].arguments, OrderedDict([
-            ('obj', env['container']),
-            ('name', 'foo'),
-            ('value', env['container'].foo),
+            ('obj' if six.PY3 else '0', env['container']),
+            ('name' if six.PY3 else '1', 'foo'),
+            ('value' if six.PY3 else '2', env['container'].foo),
         ]))
 
 
