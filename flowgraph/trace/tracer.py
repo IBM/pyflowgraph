@@ -19,7 +19,7 @@ import operator
 import six
 import types
 
-from traitlets import HasTraits, Bool, Dict, Instance, Int, List, Unicode
+from traitlets import HasTraits, Bool, Instance, List
 
 from .ast_trace import  WrapCalls, make_tracing_call_wrapper
 from .ast_transform import AttributesToFunctions, IndexingToFunctions, \
@@ -46,6 +46,9 @@ class Tracer(HasTraits):
     
     # Tracks objects using weak references.
     object_tracker = Instance(ObjectTracker, args=())
+
+    # Whether an atomic function is currently being called.
+    _in_atomic = Bool(False)
     
     # Tracer interface
 
@@ -145,6 +148,7 @@ class Tracer(HasTraits):
                                module_name=module_name, qual_name=qual_name,
                                arguments=arguments)
         self.stack.append(self.event)
+        self._in_atomic = atomic
     
     def _on_function_return(self, func, arguments, return_value):
         """ Handle function returns during tracing.
@@ -164,10 +168,15 @@ class Tracer(HasTraits):
                                  module_name=call.module_name,
                                  qual_name=call.qual_name,
                                  arguments=arguments, return_value=return_value)
+        self._in_atomic = False
     
     def _filter_call(self, func, arguments):
         """ Whether to emit trace events for function call (and return).
         """
+        if self._in_atomic:
+            # Ignore all further calls when an atomic function is executing.
+            return False
+
         if func is getattr:
             # Ignore attribute access on modules.
             first = next(iter(arguments.values()))
