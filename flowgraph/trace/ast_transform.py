@@ -146,7 +146,7 @@ class IndexingToFunctions(ast.NodeTransformer):
         target = node.target
         if isinstance(target, ast.Subscript):
             index = self.index_to_expr(target.slice)
-            return to_call(to_attribute(self.operator, 'setitem'), [
+            return ast.Expr(to_call(to_attribute(self.operator, 'setitem'), [
                 target.value,
                 index,
                 to_call(self.op_to_function(node.op), [
@@ -156,7 +156,7 @@ class IndexingToFunctions(ast.NodeTransformer):
                     ]),
                     node.value
                 ])
-            ])
+            ]))
         return node
 
 
@@ -168,7 +168,7 @@ class InplaceOperatorsToFunctions(ast.NodeTransformer):
         super(InplaceOperatorsToFunctions, self).__init__()
         self.operator = to_name(operator_module or 'operator')
     
-    def op_to_function(self, op, inplace=False):
+    def op_to_function(self, op):
         """ Convert AST operator to function in operator module.
         """
         name = op.__class__.__name__.lower()
