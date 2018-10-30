@@ -18,6 +18,7 @@ from __future__ import absolute_import
 
 import ast
 from collections import OrderedDict
+import inspect
 import sys
 import types
 try:
@@ -59,10 +60,11 @@ def bind_arguments(fun, *args, **kwargs):
     """ Bind arguments to function or method.
 
     Returns an ordered dictionary mapping argument names to values. Unlike
-    `inspect.signature`, the `self` parameter of bound methods is included.
+    `inspect.signature`, the `self` parameter of bound instance methods is
+    included.
     """
-    if isinstance(fun, types.MethodType):
-        # Case 1: Bound method, implemented in Python.
+    if inspect.ismethod(fun) and not inspect.isclass(fun.__self__):
+        # Case 1: Bound instance method, implemented in Python.
         # Reduce to Case 2 below because `Signature.bind()`` excludes `self`
         # argument in bound methods.
         args = (fun.__self__,) + args

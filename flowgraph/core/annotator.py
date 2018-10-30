@@ -17,7 +17,6 @@ from __future__ import absolute_import
 import inspect
 from operator import attrgetter
 import six
-import types
 
 from cachetools import cachedmethod
 from cachetools.keys import hashkey
@@ -83,7 +82,7 @@ class Annotator(HasTraits):
         """        
         # If the function is a method, try to find a method annotation.
         note = None
-        if isinstance(func, types.MethodType):
+        if inspect.ismethod(func):
             cls = self._get_method_self(func)
             query_extra = { 
                 'kind': 'morphism',
@@ -182,7 +181,7 @@ class Annotator(HasTraits):
         # For methods, we include the type of the object to which the method
         # is bound. This will differ from the type in the method's qualified
         # name when there is subclassing without method overriding.
-        if isinstance(func, types.MethodType):
+        if inspect.ismethod(func):
             type_key = self._get_type_key(self._get_method_self(func))
         else:
             type_key = None
@@ -196,7 +195,7 @@ class Annotator(HasTraits):
     def _get_method_self(self, func):
         """ Get the object to which the method is bound.
         """
-        assert isinstance(func, types.MethodType)
+        assert inspect.ismethod(func)
         if type(func.__self__) is type(object):
             # Class method: __self__ has type `type`
             cls = func.__self__

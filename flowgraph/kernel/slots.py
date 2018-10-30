@@ -14,9 +14,9 @@
 
 from __future__ import absolute_import
 
+import inspect
 import six
 from six.moves import reduce
-import types
 
 
 def get_slots(obj, slots):
@@ -67,7 +67,7 @@ def _get_single_slot(obj, key):
         except:
             raise AttributeError("Cannot retrieve slot %r" % key)
     else:
-        if isinstance(value, types.MethodType):
+        if inspect.ismethod(value):
             if not value.__self__ is obj:
                 raise AttributeError(
                     "Cannot retrieve method slot %r: method not bound to object" % key)

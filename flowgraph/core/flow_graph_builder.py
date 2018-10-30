@@ -17,7 +17,7 @@ from __future__ import absolute_import
 from collections import OrderedDict
 from copy import deepcopy
 import gc
-import inspect, types
+import inspect
 
 from ipykernel.jsonutil import json_clean
 import networkx as nx
@@ -128,10 +128,9 @@ class FlowGraphBuilder(HasTraits):
         check the column names and dtypes or even, if the data is small enough,
         a hash of the underlying data.
         """
-        # Special case: certain methods are never pure.
-        func_name = event.qual_name.split('.')[-1]
-        mutating_methods = ('__setattr__', '__setitem__')
-        if func_name in mutating_methods and arg_name == 'self':
+        # Special case: important functions knowns to be impure.
+        if event.qual_name in ('setattr', 'setitem') and \
+                arg_name in ('obj', '0'):
             return False
         
         # Default: pure unless explicitly annotated otherwise!
@@ -244,7 +243,7 @@ class FlowGraphBuilder(HasTraits):
             # If attribute is actually a bound method, remove the call node.
             # Method objects are not tracked and the method will be traced when
             # it is called, so the `getattr` node is redundant and useless.
-            if isinstance(event.return_value, types.MethodType):
+            if inspect.ismethod(event.return_value):
                 graph.remove_node(node)
                 return False
             # Otherwise, record the attribute as a slot access.
@@ -330,14 +329,7 @@ class FlowGraphBuilder(HasTraits):
                                   sourceport=src_port, targetport=arg_name)
         
         # Otherwise, mark the argument as an unknown input.
-        #
-        # Exceptions: Do not treat the following as inputs.
-        #   1) `self` argument in constructors
-        #   2) `cls` argument in class methods
-        elif not (event.atomic and 
-                  ((arg_name == 'self' and event.name == '__init__') or
-                   (arg_name == 'cls' and inspect.ismethod(event.function) and
-                    event.function.__self__ is arg))):
+        else:
             self._add_object_input_node(arg, arg_id, node, arg_name)
     
     def _add_object_edge(self, obj, obj_id, source, target, 
