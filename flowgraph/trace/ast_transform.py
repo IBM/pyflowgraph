@@ -207,6 +207,10 @@ class OperatorsToFunctions(ast.NodeTransformer):
         Example: `-x` -> `operator.neg(x)`
         """
         self.generic_visit(node)
+        if isinstance(node.operand, ast.Num):
+            # Don't transform negations of numeric literals. Just treat them
+            # as literals.
+            return node
         return to_call(self.op_to_function(node.op), [node.operand])
     
     def visit_BinOp(self, node):

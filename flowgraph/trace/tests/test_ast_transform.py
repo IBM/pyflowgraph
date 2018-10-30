@@ -104,6 +104,13 @@ class TestASTTransform(unittest.TestCase):
         OperatorsToFunctions().visit(node)
         self.assertEqual(to_source(node).strip(), 'operator.invert(x)')
     
+    def test_unary_negate_literal(self):
+        """ Check that negations of literals aren't transformed.
+        """
+        node = ast.parse('-1')
+        OperatorsToFunctions().visit(node)
+        self.assertEqual(to_source(node).strip(), '-1')
+    
     def test_binary_op(self):
         """ Can we replace binary operators with function calls?
         """
