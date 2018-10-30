@@ -125,6 +125,29 @@ class TestASTTransform(unittest.TestCase):
         node = ast.parse('x *= y')
         InplaceOperatorsToFunctions().visit(node)
         self.assertEqual(to_source(node).strip(), 'x = operator.imul(x, y)')
+    
+    def test_comparison_op(self):
+        """ Can we replace comparison operators with function calls?
+        """
+        node = ast.parse('x < y')
+        OperatorsToFunctions().visit(node)
+        self.assertEqual(to_source(node).strip(), 'operator.lt(x, y)')
+
+        node = ast.parse('x <= y')
+        OperatorsToFunctions().visit(node)
+        self.assertEqual(to_source(node).strip(), 'operator.le(x, y)')
+    
+    def test_contains_op(self):
+        """ Can we replace containment operators with function calls?
+        """
+        node = ast.parse('b in a')
+        OperatorsToFunctions().visit(node)
+        self.assertEqual(to_source(node).strip(), 'operator.contains(a, b)')
+
+        node = ast.parse('b not in a')
+        OperatorsToFunctions().visit(node)
+        self.assertEqual(to_source(node).strip(),
+                         'operator.not_(operator.contains(a, b))')
         
     def test_simple_getitem(self):
         """ Can we replace a simple indexing operation with `getitem`?

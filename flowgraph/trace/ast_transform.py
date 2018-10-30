@@ -216,6 +216,30 @@ class OperatorsToFunctions(ast.NodeTransformer):
         """
         self.generic_visit(node)
         return to_call(self.op_to_function(node.op), [node.left, node.right])
+    
+    def visit_Compare(self, node):
+        """ Convert comparison operator to function call.
+
+        Example: `x<y` -> `operator.lt(x,y)`
+        """
+        self.generic_visit(node)
+        if len(node.ops) > 1:
+            raise NotImplementedError("Multiple comparisons not implemented")
+
+        op, comparator = node.ops[0], node.comparators[0]
+        if isinstance(op, ast.In):
+            # Special case: `contains` reverses the operands.
+            return to_call(to_attribute(self.operator, 'contains'),
+                           [comparator, node.left])
+        elif isinstance(op, ast.NotIn):
+            # Special case: there is no `not_contains`.
+            return to_call(to_attribute(self.operator, 'not_'), [
+                to_call(to_attribute(self.operator, 'contains'),
+                           [comparator, node.left])
+            ])
+        else:
+            # General case
+            return to_call(self.op_to_function(op), [node.left, comparator])
 
 
 # Helper functions
@@ -275,6 +299,11 @@ operator_table = {
     'mult': 'mul',
     'matmult': 'matmul',
     'div': 'truediv' if six.PY3 else 'div',
+    'noteq': 'ne',
+    'lte': 'le',
+    'gte': 'ge',
+    'is': 'is_',
+    'isnot': 'is_not',
 }
 
 inplace_operator_table = {
