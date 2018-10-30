@@ -90,12 +90,16 @@ def flow_graph_to_graphml(graph, simplify_outputs=False):
     data_keys = { 'annotation' }
     
     ninputs = 0
+    input_map = {}
     for _, _, data in graph.out_edges(input_node, data=True):
-        ninputs += 1
-        portname = 'in:' + str(ninputs)
+        portname = input_map.get(data['id'])
+        if not portname:
+            ninputs += 1
+            portname = 'in:' + str(ninputs)
+            port_data = ports[portname] = { 'portkind': 'input' }
+            port_data.update({k: data[k] for k in data_keys if k in data })
+            input_map[data['id']] = portname
         data['sourceport'] = portname
-        port_data = ports[portname] = { 'portkind': 'input' }
-        port_data.update({k: data[k] for k in data_keys if k in data })
     
     noutputs = 0
     for src, _, key, data in list(graph.in_edges(output_node, keys=True, data=True)):

@@ -825,6 +825,40 @@ class TestFlowGraph(unittest.TestCase):
         self.assertEqual(graph.nodes, recovered.nodes)
         self.assertEqual(graph.edges, recovered.edges)
     
+    def test_graphml_input_ports(self):
+        """ Does a GraphML serialized flow graph have correct input ports?
+        """
+        env = {
+            'foo1': objects.Foo(),
+            'foo2': objects.Foo(),
+        }
+        recorded_graph = self.record("""
+            bar1 = objects.bar_from_foo(foo1)
+            bar2a = objects.bar_from_foo(foo2)
+            bar2b = objects.bar_from_foo(foo2)
+        """, env=env)
+
+        outer = flow_graph_to_graphml(recorded_graph)
+        root = list(outer.nodes)[0]
+        graph, ports = outer.nodes[root]['graph'], outer.nodes[root]['ports']
+        in_ports = [ port for port in ports.values()
+                     if port['portkind'] == 'input' ]
+        inputs = sorted(data['id'] for _, _, data in
+                         graph.out_edges(graph.graph['input_node'], data=True))
+        self.assertEqual(in_ports, [
+            {
+                'portkind': 'input',
+                'annotation': 'python/flowgraph/foo',
+            },
+            {
+                'portkind': 'input',
+                'annotation': 'python/flowgraph/foo',
+            },
+        ])
+        self.assertEqual(inputs, sorted([
+            self.id('foo1'), self.id('foo2'), self.id('foo2')
+        ]))
+    
     def test_graphml_output_ports(self):
         """ Does a GraphML-serialized flow graph have correct output ports?
         """
@@ -839,8 +873,8 @@ class TestFlowGraph(unittest.TestCase):
         # FIXME: Outputs ports should have a deterministic order.
         sorted_ports = sorted(ports.values(),
                               key=lambda d: d['annotation'], reverse=True)
-        outputs = { data['id'] for _, _, data in
-                    graph.in_edges(graph.graph['output_node'], data=True) }
+        outputs = sorted(data['id'] for _, _, data in
+                         graph.in_edges(graph.graph['output_node'], data=True))
         self.assertEqual(sorted_ports, [
             {
                 'portkind': 'output',
@@ -851,20 +885,20 @@ class TestFlowGraph(unittest.TestCase):
                 'annotation': 'python/flowgraph/bar',
             },
         ])
-        self.assertEqual(outputs, { self.id('foo'), self.id('bar') })
+        self.assertEqual(outputs, sorted([ self.id('foo'), self.id('bar') ]))
         
         outer = flow_graph_to_graphml(recorded_graph, simplify_outputs=True)
         root = list(outer.nodes)[0]
         graph, ports = outer.nodes[root]['graph'], outer.nodes[root]['ports']
-        outputs = { data['id'] for _, _, data in
-                    graph.in_edges(graph.graph['output_node'], data=True) }
+        outputs = sorted(data['id'] for _, _, data in
+                         graph.in_edges(graph.graph['output_node'], data=True))
         self.assertEqual(list(ports.values()), [
             {
                 'portkind': 'output',
                 'annotation': 'python/flowgraph/bar',
             },
         ])
-        self.assertEqual(outputs, { self.id('bar') })
+        self.assertEqual(outputs, [ self.id('bar') ])
 
 
 if __name__ == '__main__':
