@@ -28,32 +28,7 @@ except ImportError:
     # Python 2.7 to 3.2
     from funcsigs import signature
 
-from .ast_transform import to_call, to_name
-
-
-def make_tracing_call_wrapper(on_call=None, on_return=None, filter_call=None):
-    """ Higher-order function to create call wrappers for tracing.
-
-    The wrapper calls the given functions before and/or after the wrapped
-    function is called.
-    """
-    def wrapper(fun, *args, **kwargs):
-        # Pre-call.
-        arguments = bind_arguments(fun, *args, **kwargs)
-        ok = filter_call is None or filter_call(fun, arguments)
-        if ok and on_call is not None:
-            on_call(fun, arguments)
-
-        # Call!
-        return_value = fun(*args, **kwargs)
-
-        # Post-call.
-        if ok and on_return is not None:
-            on_return(fun, arguments, return_value)
-
-        return return_value
-    
-    return wrapper
+from .ast_transform import to_attribute, to_call, to_name
 
 
 def bind_arguments(fun, *args, **kwargs):
@@ -61,7 +36,7 @@ def bind_arguments(fun, *args, **kwargs):
 
     Returns an ordered dictionary mapping argument names to values. Unlike
     `inspect.signature`, the `self` parameter of bound instance methods is
-    included.
+    included as an argument.
     """
     if inspect.ismethod(fun) and not inspect.isclass(fun.__self__):
         # Case 1: Bound instance method, implemented in Python.
@@ -97,8 +72,8 @@ def bind_arguments(fun, *args, **kwargs):
     return arguments
 
 
-class WrapCalls(ast.NodeTransformer):
-    """ Wrap all function and method calls in AST.
+class TraceFunctionCalls(ast.NodeTransformer):
+    """ Rewrite AST to trace function and method calls.
 
     Replaces function and method calls, e.g.
 
@@ -106,20 +81,35 @@ class WrapCalls(ast.NodeTransformer):
     
     with wrapped calls, e.g.
 
-        wrapper(f, x, y, z=1)
+        trace_return(trace_function(f)(
+            trace_argument(x), trace_argument(y), z=trace_argument(1)))
     """
 
-    def __init__(self, wrapper):
-        super(WrapCalls, self).__init__()
-        self.wrapper = to_name(wrapper)
+    def __init__(self, tracer):
+        super(TraceFunctionCalls, self).__init__()
+        self.tracer = to_name(tracer)
+    
+    def trace_method(self, method):
+        return to_attribute(self.tracer, method)
+    
+    def trace_function(self, f):
+        return to_call(self.trace_method('trace_function'), [f])
+    
+    def trace_argument(self, arg, kw=None):
+        return to_call(self.trace_method('trace_argument'),
+                       [arg, ast.Str(kw)] if kw is not None else [arg])
+    
+    def trace_return(self, return_value):
+        return to_call(self.trace_method('trace_return'), [return_value])
     
     def visit_Call(self, call):
         self.generic_visit(call)
-        new_args = [ call.func ] + call.args
-        if sys.version_info.major >= 3 and sys.version_info.minor >= 5:
-            # Representation of *args and **kwargs changed in Python 3.5.
-            new_call = ast.Call(self.wrapper, new_args, call.keywords)
-        else:
-            new_call = ast.Call(self.wrapper, new_args, call.keywords,
-                                call.starargs, call.kwargs)
-        return new_call
+        # FIXME: starargs, starkwargs
+        # FIXME: Python 2
+        args = [ self.trace_argument(arg) for arg in call.args ]
+        keywords = [ ast.keyword(kw.arg, self.trace_argument(kw.value, kw.arg))
+                     for kw in call.keywords ]
+        return self.trace_return(
+            to_call(self.trace_function(call.func), args, keywords)
+        )
+
