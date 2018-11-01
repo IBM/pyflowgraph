@@ -248,14 +248,15 @@ class OperatorsToFunctions(ast.NodeTransformer):
 
 # Helper functions
 
-def to_call(func, args=[], keywords=[]):
+def to_call(func, args=[], keywords=[], starargs=None, kwargs=None):
     """ Create a Call AST node.
     """
     if sys.version_info.major >= 3 and sys.version_info.minor >= 5:
         # Representation of *args and **kwargs changed in Python 3.5.
+        assert starargs is None and kwargs is None
         return ast.Call(func, args, keywords)
     else:
-        return ast.Call(func, args, keywords, None, None)
+        return ast.Call(func, args, keywords, starargs, kwargs)
 
 def to_attribute(value, attr, ctx=None):
     """ Create an Attribute AST node.

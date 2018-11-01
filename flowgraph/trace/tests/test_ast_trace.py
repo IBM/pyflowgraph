@@ -41,11 +41,12 @@ class TestASTTrace(unittest.TestCase):
         self.history.append(('function', func, nargs))
         return func
     
-    def trace_argument(self, arg_value, arg_name=None):
+    def trace_argument(self, arg_value, arg_name=None, nstars=0):
         """ Record argument evaluation.
         """
         self.history.append(
-            ('arg', (arg_name, arg_value) if arg_name else arg_value)
+            ('*'*nstars + 'arg',
+             (arg_name, arg_value) if arg_name else arg_value)
         )
         return arg_value
     
@@ -63,7 +64,6 @@ class TestASTTrace(unittest.TestCase):
         env['__trace__'] = self
 
         ast.fix_missing_locations(node)
-        import astor; print(astor.to_source(node))
         code = compile(node, filename='<ast>', mode='exec')
         exec(code, env)
 
@@ -124,6 +124,59 @@ class TestASTTrace(unittest.TestCase):
             ('function', Fraction, 2),
             ('arg', ('numerator', 3)),
             ('arg', ('denominator', 7)),
+            ('return', Fraction(3,7)),
+        ])
+
+    def test_trace_star_args(self):
+        """ Can we trace calls with *args?
+        """
+        node = ast.parse(dedent("""
+        from fractions import Fraction
+        args = [3, 7]
+        Fraction(*args)
+        """))
+        TraceFunctionCalls('__trace__').visit(node)
+
+        self.exec_ast(node)
+        self.assertEqual(self.history, [
+            ('function', Fraction, 1),
+            ('*arg', [3, 7]),
+            ('return', Fraction(3,7)),
+        ])
+    
+    def test_trace_star_kwargs(self):
+        """ Can we trace calls with **kwargs?
+        """
+        node = ast.parse(dedent("""
+        from fractions import Fraction
+        kwargs = { 'numerator': 3, 'denominator': 7}
+        Fraction(**kwargs)
+        """))
+        TraceFunctionCalls('__trace__').visit(node)
+
+        self.exec_ast(node)
+        self.assertEqual(self.history, [
+            ('function', Fraction, 1),
+            ('**arg', { 'numerator': 3, 'denominator': 7 }),
+            ('return', Fraction(3,7)),
+        ])
+
+    def test_trace_star_args_and_kwargs(self):
+        """ Can we trace calls with both *args and **kwargs?
+        """
+        node = ast.parse(dedent("""
+        from fractions import Fraction
+        args = [3]
+        kwargs = { 'denominator': 7}
+        Fraction(*args, **kwargs)
+        """))
+        TraceFunctionCalls('__trace__').visit(node)
+
+        self.exec_ast(node)
+        self.assertEqual(self.history, [
+            ('function', Fraction, 2),
+            ('*arg', [3]),
+            ('**arg', { 'denominator': 7 }),
             ('return', Fraction(3,7)),
         ])
 

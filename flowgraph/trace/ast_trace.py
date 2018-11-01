@@ -30,6 +30,9 @@ except ImportError:
 
 from .ast_transform import to_attribute, to_call, to_name
 
+# Does `ast.Starred` exist?
+ast_has_starred = sys.version_info.major >= 3 and sys.version_info.minor >= 5
+
 
 def bind_arguments(fun, *args, **kwargs):
     """ Bind arguments to function or method.
@@ -97,25 +100,51 @@ class TraceFunctionCalls(ast.NodeTransformer):
             func, ast.Num(nargs)
         ])
     
-    def trace_argument(self, arg_value, arg_name=None):
-        return to_call(self.trace_method('trace_argument'), [
-            arg_value, ast.Str(arg_name)
-        ] if arg_name is not None else [
-            arg_value
-        ])
+    def trace_argument(self, arg_value, arg_name=None, nstars=0):
+        # Unpack starred expression in Python 3.5+.
+        starred = ast_has_starred and isinstance(arg_value, ast.Starred)
+        if starred:
+            arg_value = arg_value.value
+            nstars = 1
+        
+        # Create new call.
+        args = [ arg_value ]
+        if arg_name:
+            args += [ ast.Str(arg_name) ]
+        keywords = []
+        if nstars:
+            keywords += [ ast.keyword('nstars', ast.Num(nstars)) ]
+        call = to_call(self.trace_method('trace_argument'), args, keywords)
+
+        # Repack starred expression in Python 3.5+.
+        if starred:
+            call = ast.Starred(call, ast.Load())
+        return call
     
     def trace_return(self, return_value):
         return to_call(self.trace_method('trace_return'), [return_value])
     
     def visit_Call(self, call):
+        """ Rewrite AST Call node.
+        """
         self.generic_visit(call)
-        # FIXME: starargs, starkwargs
-        # FIXME: Python 2
         args = [ self.trace_argument(arg) for arg in call.args ]
-        keywords = [ ast.keyword(kw.arg, self.trace_argument(kw.value, kw.arg))
-                     for kw in call.keywords ]
+        keywords = [ ast.keyword(kw.arg, self.trace_argument(
+                        kw.value, kw.arg, 2 if kw.arg is None else 0
+                     )) for kw in call.keywords ]
         nargs = len(args) + len(keywords)
-        return self.trace_return(
-            to_call(self.trace_function(call.func, nargs), args, keywords)
-        )
 
+        # Handle *args and **kwargs in Python 3.4 and lower.
+        starargs, kwargs = None, None
+        if not ast_has_starred:
+            if call.starargs is not None:
+                starargs = self.trace_argument(call.starargs, nstars=1)
+                nargs += 1
+            if call.kwargs is not None:
+                kwargs = self.trace_argument(call.kwargs, nstars=2)
+                nargs += 1
+
+        return self.trace_return(
+            to_call(self.trace_function(call.func, nargs),
+                    args, keywords, starargs, kwargs)
+        )
