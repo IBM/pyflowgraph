@@ -21,6 +21,10 @@ import unittest
 
 from ..ast_trace import TraceFunctionCalls
 
+# Imports for test code only.
+from fractions import Fraction
+
+
 
 class TestASTTrace(unittest.TestCase):
     """ Test cases for abstract syntax tree (AST) tracing transformers.
@@ -31,17 +35,19 @@ class TestASTTrace(unittest.TestCase):
         """
         self.history = []
 
-    def trace_function(self, f):
+    def trace_function(self, func, nargs):
         """ Record function evaluation (not function call!).
         """
-        self.history.append(('function', f))
-        return f
+        self.history.append(('function', func, nargs))
+        return func
     
-    def trace_argument(self, arg, kw=None):
+    def trace_argument(self, arg_value, arg_name=None):
         """ Record argument evaluation.
         """
-        self.history.append(('arg', (kw, arg) if kw is not None else arg))
-        return arg
+        self.history.append(
+            ('arg', (arg_name, arg_value) if arg_name else arg_value)
+        )
+        return arg_value
     
     def trace_return(self, return_value):
         """ Record function return.
@@ -66,8 +72,6 @@ class TestASTTrace(unittest.TestCase):
     def test_trace_calls(self):
         """ Can we trace calls of Python functions?
         """
-        from fractions import Fraction
-
         node = ast.parse(dedent("""
         from fractions import Fraction
         x = Fraction(3,7)
@@ -80,11 +84,11 @@ class TestASTTrace(unittest.TestCase):
         self.assertEqual(x, Fraction(3,7))
         self.assertEqual(y, Fraction(1,2))
         self.assertEqual(self.history, [
-            ('function', Fraction),
+            ('function', Fraction, 2),
             ('arg', 3),
             ('arg', 7),
             ('return', Fraction(3,7)),
-            ('function', x.limit_denominator),
+            ('function', x.limit_denominator, 1),
             ('arg', 2),
             ('return', Fraction(1,2))
         ])
@@ -98,8 +102,8 @@ class TestASTTrace(unittest.TestCase):
         self.exec_ast(node)
         self.assertEqual(self.env['x'], sum(range(5)))
         self.assertEqual(self.history, [
-            ('function', sum),
-            ('function', range),
+            ('function', sum, 1),
+            ('function', range, 1),
             ('arg', 5),
             ('return', range(5)),
             ('arg', range(5)),
@@ -109,8 +113,6 @@ class TestASTTrace(unittest.TestCase):
     def test_trace_keyword_arguments(self):
         """ Can we trace calls with keyword arguments?
         """
-        from fractions import Fraction
-
         node = ast.parse(dedent("""
         from fractions import Fraction
         Fraction(numerator=3, denominator=7)
@@ -119,7 +121,7 @@ class TestASTTrace(unittest.TestCase):
 
         self.exec_ast(node)
         self.assertEqual(self.history, [
-            ('function', Fraction),
+            ('function', Fraction, 2),
             ('arg', ('numerator', 3)),
             ('arg', ('denominator', 7)),
             ('return', Fraction(3,7)),

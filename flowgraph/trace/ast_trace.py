@@ -92,12 +92,17 @@ class TraceFunctionCalls(ast.NodeTransformer):
     def trace_method(self, method):
         return to_attribute(self.tracer, method)
     
-    def trace_function(self, f):
-        return to_call(self.trace_method('trace_function'), [f])
+    def trace_function(self, func, nargs):
+        return to_call(self.trace_method('trace_function'), [
+            func, ast.Num(nargs)
+        ])
     
-    def trace_argument(self, arg, kw=None):
-        return to_call(self.trace_method('trace_argument'),
-                       [arg, ast.Str(kw)] if kw is not None else [arg])
+    def trace_argument(self, arg_value, arg_name=None):
+        return to_call(self.trace_method('trace_argument'), [
+            arg_value, ast.Str(arg_name)
+        ] if arg_name is not None else [
+            arg_value
+        ])
     
     def trace_return(self, return_value):
         return to_call(self.trace_method('trace_return'), [return_value])
@@ -109,7 +114,8 @@ class TraceFunctionCalls(ast.NodeTransformer):
         args = [ self.trace_argument(arg) for arg in call.args ]
         keywords = [ ast.keyword(kw.arg, self.trace_argument(kw.value, kw.arg))
                      for kw in call.keywords ]
+        nargs = len(args) + len(keywords)
         return self.trace_return(
-            to_call(self.trace_function(call.func), args, keywords)
+            to_call(self.trace_function(call.func, nargs), args, keywords)
         )
 
