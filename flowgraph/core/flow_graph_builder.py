@@ -14,14 +14,14 @@
 
 from __future__ import absolute_import
 
-from collections import OrderedDict
+from collections import deque, OrderedDict
 from copy import deepcopy
 import gc
 import inspect
 
 from ipykernel.jsonutil import json_clean
 import networkx as nx
-from traitlets import HasTraits, Bool, Dict, Instance, List, Unicode, default
+from traitlets import HasTraits, Bool, Dict, Instance, Unicode, default
 
 from flowgraph.kernel.slots import get_slot
 from flowgraph.trace.inspect_names import get_class_module_name, \
@@ -50,7 +50,7 @@ class FlowGraphBuilder(HasTraits):
     
     # Private traits.
     _node_names = Dict()
-    _stack = List() # List(Instance(_CallContext))
+    _stack = Instance(deque, ()) # List(Instance(_CallContext))
     
     # Public interface
     
@@ -82,7 +82,8 @@ class FlowGraphBuilder(HasTraits):
         # It simply contains the root flow graph and associated state.
         graph = new_flow_graph()
         self._node_names = {}
-        self._stack = [ _CallContext(graph=graph) ]
+        self._stack.clear()
+        self._stack.append(_CallContext(graph=graph))
     
     def is_primitive(self, obj):
         """ Is the object considered primitive?

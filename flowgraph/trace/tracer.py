@@ -15,7 +15,7 @@
 from __future__ import absolute_import
 
 import ast
-from collections import OrderedDict
+from collections import deque, OrderedDict
 import operator
 import six
 import types
@@ -48,7 +48,7 @@ class Tracer(HasTraits):
     object_tracker = Instance(ObjectTracker, args=())
 
     # Scope stack for currently executing code.
-    _stack = List() # List(Instance(_ScopeItem))
+    _stack = Instance(deque, ()) # List(Instance(_ScopeItem))
     
     # Tracer interface
 
@@ -73,7 +73,8 @@ class Tracer(HasTraits):
         """
         # Reset state.
         self.event = None
-        self._stack = [ _ScopeItem() ]
+        self._stack.clear()
+        self._stack.append(_ScopeItem())
 
         # Parse the code into AST.
         if isinstance(code_or_node, six.string_types):
@@ -246,6 +247,21 @@ class Tracer(HasTraits):
         return True
 
 
+class _ScopeItem(HasTraits):
+    """ Stack item for scope of currently executing code.
+    """
+
+    # Call event for currenting evaluating function call.
+    # If None, we're at the top level.
+    event = Instance(TraceCall, allow_none=True)
+
+    # Whether to emit call and return events for this scope?
+    emit_events = Bool(True)
+
+    # Stack of evaluating function calls.
+    call_stack = Instance(deque, ()) # List(Instance(_CallItem))
+
+
 class _CallItem(HasTraits):
     """ Stack item for function calls in currently evaluating expression.
     """
@@ -261,18 +277,3 @@ class _CallItem(HasTraits):
 
     # Keyword arguments recorded so far.
     keywords = Instance(OrderedDict, ())
-
-
-class _ScopeItem(HasTraits):
-    """ Stack item for scope of currently executing code.
-    """
-
-    # Call event for currenting evaluating function call.
-    # If None, we're at the top level.
-    event = Instance(TraceCall, allow_none=True)
-
-    # Whether to emit call and return events for this scope?
-    emit_events = Bool(True)
-
-    # Stack of evaluating function calls.
-    call_stack = List(Instance(_CallItem))
