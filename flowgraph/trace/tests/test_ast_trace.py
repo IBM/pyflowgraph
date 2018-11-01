@@ -25,7 +25,6 @@ from ..ast_trace import TraceFunctionCalls
 from fractions import Fraction
 
 
-
 class TestASTTrace(unittest.TestCase):
     """ Test cases for abstract syntax tree (AST) tracing transformers.
     """

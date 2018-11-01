@@ -229,8 +229,7 @@ class IntegrationTestFlowGraph(unittest.TestCase):
                         annotation='python/numpy/ndarray')
         self.assert_isomorphic(graph, target)
     
-    #@unittest.skipIf('CI' in os.environ, "needs to download R dataset")
-    @unittest.skip("Broken because AST rewriting changes the call stack")
+    @unittest.skipIf('CI' in os.environ, "needs to download R dataset")
     def test_statsmodel_regression(self):
         """ Linear regression on an R dataset using statsmodels.
         """
@@ -248,7 +247,7 @@ class IntegrationTestFlowGraph(unittest.TestCase):
                         qual_name=('RegressionModel' if six.PY3 else 'OLS') + '.fit',
                         annotation='python/statsmodels/fit')
         target.add_edge('read', 'read-get',
-                        sourceport='__return__', targetport='self',
+                        sourceport='__return__', targetport='0',
                         annotation='python/statsmodels/dataset')
         target.add_edge('read-get', 'ols',
                         sourceport='__return__', targetport='data',
