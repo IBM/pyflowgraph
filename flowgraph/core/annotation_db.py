@@ -122,7 +122,7 @@ class Annotation(blitzdb.Document):
     language = fields.CharField(nullable=False, indexed=True)
     package = fields.CharField(nullable=False, indexed=True)
     id = fields.CharField(nullable=False, indexed=True)
-    kind = fields.EnumField(['object', 'morphism'], nullable=False, indexed=True)
+    kind = fields.EnumField(['type', 'function'], nullable=False, indexed=True)
     
     function = fields.CharField(nullable=True, indexed=True)
     method = fields.CharField(nullable=True, indexed=True)
