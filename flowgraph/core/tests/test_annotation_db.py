@@ -40,7 +40,7 @@ class TestAnnotationDB(unittest.TestCase):
         query = {'id': 'XXX'} # No matches
         self.assertEqual(self.db.get(query), None)
         
-        query = {'kind': 'object'} # Multiple matches
+        query = {'kind': 'type'} # Multiple matches
         with self.assertRaises(LookupError):
             self.db.get(query)
     

@@ -85,7 +85,7 @@ class Annotator(HasTraits):
         if inspect.ismethod(func):
             cls = self._get_method_self(func)
             query_extra = { 
-                'kind': 'morphism',
+                'kind': 'function',
                 'method': func.__name__,
             }
             note = self._resolve_type(cls, query_extra)
@@ -97,7 +97,7 @@ class Annotator(HasTraits):
             query = { 
                 'language': 'python',
                 'package': package,
-                'kind': 'morphism',
+                'kind': 'function',
                 'function': name,
             }
             note = next(self._query(query), None)
@@ -109,7 +109,7 @@ class Annotator(HasTraits):
     def _cached_notate_type(self, type):
         """ Notate a type, returning the primary key or None.
         """
-        extra_query = { 'kind': 'object' }
+        extra_query = { 'kind': 'type' }
         note = self._resolve_type(type, extra_query)
         return note['pk'] if note else None
     

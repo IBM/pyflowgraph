@@ -134,9 +134,9 @@ class FlowGraphBuilder(HasTraits):
             return False
         
         # Default: pure unless explicitly annotated otherwise!
-        codomain = annotation.get('codomain', [])
+        outputs = annotation.get('outputs', [])
         slots = _IOSlots(event)
-        return not any(arg_name == slots._name(obj['slot']) for obj in codomain)
+        return not any(arg_name == slots._name(obj['slot']) for obj in outputs)
     
     # Protected interface
             
@@ -219,7 +219,7 @@ class FlowGraphBuilder(HasTraits):
             'ports': self._get_ports_data(
                 event,
                 event.arguments.keys(),
-                [ dom['slot'] for dom in annotation.get('domain', []) ],
+                [ dom['slot'] for dom in annotation.get('inputs', []) ],
                 { 'portkind': 'input' },
             ),
         }
@@ -270,7 +270,7 @@ class FlowGraphBuilder(HasTraits):
         ports.update(self._get_ports_data(
             event,
             port_names,
-            [ dom['slot'] for dom in annotation.get('codomain', []) ],
+            [ dom['slot'] for dom in annotation.get('outputs', []) ],
             { 'portkind': 'output' },
         ))
         
@@ -435,7 +435,7 @@ class FlowGraphBuilder(HasTraits):
         ports = OrderedDict()
         slots = _IOSlots(event)
         annotation_table = { 
-            # Index annotation domain starting at 1: it is language-agnostic.
+            # Index annotations start at 1: it is language-agnostic.
             slots._name(slot): i+1 for i, slot in enumerate(annotation)
         }
         for name in names:
