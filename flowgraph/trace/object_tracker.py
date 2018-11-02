@@ -77,6 +77,7 @@ class ObjectTracker(HasTraits):
         # We never track function, method, or module objects, even though they
         # are weakref-able.
         if isinstance(obj, (types.FunctionType, types.MethodType, 
+                            types.BuiltinFunctionType, types.BuiltinMethodType,
                             types.ModuleType)):
             return False
         
