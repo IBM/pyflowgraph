@@ -24,7 +24,7 @@ import networkx as nx
 from traitlets import HasTraits, Bool, Dict, Instance, Unicode, default
 
 from flowgraph.kernel.slots import get_slot
-from flowgraph.trace.inspect_names import get_class_module_name, \
+from flowgraph.trace.inspect_name import get_class_module_name, \
     get_class_qual_name
 from flowgraph.trace.object_tracker import ObjectTracker
 from flowgraph.trace.trace_event import TraceEvent, TraceCall, TraceReturn

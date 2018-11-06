@@ -22,10 +22,11 @@ import types
 
 from traitlets import HasTraits, Any, Bool, Instance, Int, List
 
-from .ast_trace import TraceFunctionCalls, bind_arguments
+from .ast_trace import TraceFunctionCalls
 from .ast_transform import AttributesToFunctions, IndexingToFunctions, \
     InplaceOperatorsToFunctions, OperatorsToFunctions
-from .inspect_names import get_func_module_name, get_func_qual_name
+from .inspect_function import bind_arguments
+from .inspect_name import get_func_module_name, get_func_qual_name
 from .object_tracker import ObjectTracker
 from .trace_event import TraceEvent, TraceCall, TraceReturn
 

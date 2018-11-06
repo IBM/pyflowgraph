@@ -24,7 +24,7 @@ except ImportError:
     np = None
 
 from flowgraph.core.tests import objects
-from ..inspect_names import *
+from ..inspect_name import *
 
 
 class TestInspectNames(unittest.TestCase):
