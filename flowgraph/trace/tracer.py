@@ -132,7 +132,7 @@ class Tracer(HasTraits):
         elif nstars == 2:
             call.keywords.update(arg_value)
         else:
-            raise ValueError("nargs must be 0, 1, or 2")
+            raise ValueError("nstars must be 0, 1, or 2")
 
         # If this argument was the last, the function will now be called.
         call.nargs -= 1
@@ -234,7 +234,7 @@ class Tracer(HasTraits):
         return TraceReturn(tracer=self, function=call.function,
                            atomic=call.atomic, module_name=call.module_name,
                            qual_name=call.qual_name,
-                           arguments=call.arguments, return_value=return_value)
+                           arguments=call.arguments, value=return_value)
     
     def _filter_call(self, func, arguments):
         """ Whether to emit trace events for function call (and return).

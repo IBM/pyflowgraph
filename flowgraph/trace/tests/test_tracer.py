@@ -97,7 +97,7 @@ class TestTracer(unittest.TestCase):
         self.assertEqual(event.function, objects.create_foo)
         self.assertEqual(event.module_name, objects.__name__)
         self.assertEqual(event.qual_name, 'create_foo')
-        self.assertEqual(event.return_value, env['foo'])
+        self.assertEqual(event.value, env['foo'])
     
     def test_atomic_nested_return(self):
         """ Test that the bodies of atomic functions are not traced.
@@ -148,9 +148,9 @@ class TestTracer(unittest.TestCase):
         self.assertEqual(events[2].arguments, OrderedDict([
             ('0',env['container']), ('1','foo_property')
         ]))
-        self.assertEqual(events[3].return_value, env['foo1'])
+        self.assertEqual(events[3].value, env['foo1'])
         self.assertEqual(events[4].qual_name, 'getattr')
-        self.assertEqual(events[5].return_value, env['foo2'])
+        self.assertEqual(events[5].value, env['foo2'])
     
     def test_setattr(self):
         """ Are attribute setters traced?

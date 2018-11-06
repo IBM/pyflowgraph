@@ -186,7 +186,7 @@ class FlowGraphBuilder(HasTraits):
         
         # Set output for return value(s).
         object_tracker = event.tracer.object_tracker
-        return_value = event.return_value
+        return_value = event.value
         if isinstance(return_value, tuple):
             # Interpret tuples as multiple return values, per Python convention.
             for i, value in enumerate(return_value):
@@ -244,7 +244,7 @@ class FlowGraphBuilder(HasTraits):
             # If attribute is actually a bound method, remove the call node.
             # Method objects are not tracked and the method will be traced when
             # it is called, so the `getattr` node is redundant and useless.
-            if inspect.ismethod(event.return_value):
+            if inspect.ismethod(event.value):
                 graph.remove_node(node)
                 return False
             # Otherwise, record the attribute as a slot access.
@@ -257,7 +257,7 @@ class FlowGraphBuilder(HasTraits):
         
         # Add output ports.
         port_names = []
-        return_value = event.return_value
+        return_value = event.value
         if isinstance(return_value, tuple):
             for i in range(len(return_value)):
                 port_names.append('__return__.%i' % i)
@@ -304,7 +304,7 @@ class FlowGraphBuilder(HasTraits):
         """
         context = self._stack[-1]
         data = context.graph.nodes[node]
-        note = self.annotator.notate_object(event.return_value)
+        note = self.annotator.notate_object(event.value)
         if note:
             data.update({
                 'annotation': self._annotation_key(note),
@@ -581,7 +581,7 @@ class _IOSlots(object):
     def __getattr__(self, name):
         event = self.__event
         if name == '__return__':
-            return event.return_value
+            return event.value
         try:
             return event.arguments[name]
         except KeyError:
