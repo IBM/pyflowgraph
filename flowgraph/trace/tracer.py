@@ -22,7 +22,7 @@ import types
 
 from traitlets import HasTraits, Any, Bool, Instance, Int, List
 
-from .ast_trace import TraceFunctionCalls
+from .ast_tracer import ASTTracer, TraceFunctionCalls
 from .ast_transform import AttributesToFunctions, IndexingToFunctions, \
     InplaceOperatorsToFunctions, OperatorsToFunctions
 from .inspect_function import bind_arguments
@@ -31,7 +31,7 @@ from .object_tracker import ObjectTracker
 from .trace_event import TraceEvent, TraceCall, TraceReturn
 
 
-class Tracer(HasTraits):
+class Tracer(ASTTracer):
     """ Execution tracer for Python.
     
     The tracer executes Python code and emits trace events as the code runs.
@@ -103,21 +103,21 @@ class Tracer(HasTraits):
         """
         return self.object_tracker.track(obj)
     
-    # Trace handlers
+    # AST Tracer interface
 
-    def trace_function(self, function, nargs):
-        """ Called after function object (not function call!) is evaluated.
+    def _trace_function(self, function, nargs):
+        """ Called after function object is evaluated.
         """
         scope = self._stack[-1]
         scope.call_stack.append(_CallItem(function=function, nargs=nargs))
 
         # If there are no arguments, the function will now be called.
         if nargs == 0:
-            self.trace_call()
+            self._trace_call()
 
         return function
     
-    def trace_argument(self, arg_value, arg_name=None, nstars=0):
+    def _trace_argument(self, arg_value, arg_name=None, nstars=0):
         """ Called after function argument is evaluated.
         """
         # Record argument(s) in appropriate place.
@@ -138,11 +138,11 @@ class Tracer(HasTraits):
         # If this argument was the last, the function will now be called.
         call.nargs -= 1
         if call.nargs == 0:
-            self.trace_call()
+            self._trace_call()
         
         return arg_value
     
-    def trace_call(self):
+    def _trace_call(self):
         """ Called immediately before function is called.
         """
         prev_scope = self._stack[-1]
@@ -163,7 +163,7 @@ class Tracer(HasTraits):
         scope = _ScopeItem(event=event, emit_events=emit_events)
         self._stack.append(scope)
     
-    def trace_return(self, return_value):
+    def _trace_return(self, return_value):
         """ Called after function returns.
         """
         scope = self._stack.pop()

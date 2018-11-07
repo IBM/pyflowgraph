@@ -20,9 +20,61 @@ import ast
 import sys
 from .ast_transform import to_attribute, to_call, to_name
 
+from traitlets import HasTraits, Any
+
 # Does `ast.Starred` exist?
 ast_has_starred = sys.version_info.major >= 3 and sys.version_info.minor >= 5
 
+
+class ASTTracer(HasTraits):
+    """ Trace function and method calls by AST rewriting.
+
+    This class should be used with the `TraceFunctionCalls` AST transformer. 
+    It is very low-level and should be supplemented with additional logic to be
+    useful. The `Tracer` class in this subpackage shows how to do this in an
+    event-based way.
+    """
+
+    def trace_function(self, function, nargs):
+        """ Called after function object (not function call!) is evaluated.
+        """
+        return self._unbox(self._trace_function(function, nargs))
+    
+    def trace_argument(self, arg_value, arg_name=None, nstars=0):
+        """ Called after function argument is evaluated.
+        """
+        return self._unbox(self._trace_argument(arg_value, arg_name, nstars))
+
+    def trace_return(self, return_value):
+        """ Called after function returns.
+        """
+        return self._unbox(self._trace_return(return_value))
+    
+    def _trace_function(self, function, args):
+        """ Called after function object is evaluated.
+        
+        May be reimplemented in subclass.
+        """
+        return function
+    
+    def _trace_argument(self, arg_value, arg_name=None, nstars=0):
+        """ Called after function argument is evaluated.
+        
+        May be reimplemented in subclass.
+        """
+        return arg_value
+    
+    def _trace_return(self, return_value):
+        """ Called after function returns.
+
+        May be reimplemented in subclasss.
+        """
+        return return_value
+    
+    def _unbox(self, x):
+        """ Unbox a value, if it is boxed.
+        """
+        return x.value if isinstance(x, BoxedValue) else x
 
 
 class TraceFunctionCalls(ast.NodeTransformer):
@@ -35,7 +87,7 @@ class TraceFunctionCalls(ast.NodeTransformer):
     with wrapped calls, e.g.
 
         trace_return(trace_function(f)(
-            trace_argument(x), trace_argument(y), z=trace_argument(1)))
+            trace_argument(x), trace_argument(y), z=trace_argument(1,'z')))
     """
 
     def __init__(self, tracer):
@@ -98,3 +150,15 @@ class TraceFunctionCalls(ast.NodeTransformer):
             to_call(self.trace_function(call.func, nargs),
                     args, keywords, starargs, kwargs)
         )
+
+
+class BoxedValue(HasTraits):
+    """ A boxed value.
+
+    Boxed values can be to pass extra data, not contained in the original
+    program, between tracer callbacks. This is useful for connecting function
+    arguments to the function call, for example.
+
+    Note that the value in the box may have any type, not necessarily primitive.
+    """
+    value = Any()
