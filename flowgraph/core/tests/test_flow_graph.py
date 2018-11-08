@@ -363,6 +363,7 @@ class TestFlowGraph(unittest.TestCase):
         target.add_edge('1', outputs, id=self.id('foo'), sourceport='__return__')
         self.assert_isomorphic(actual, target)
     
+    @unittest.skip("Static analysis for sequence literals not implemented")
     def test_track_inside_list(self):
         """ Test a function call with tracked objects inside a list.
         """

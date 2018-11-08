@@ -156,8 +156,6 @@ class FlowGraphBuilder(HasTraits):
         object_tracker = event.tracer.object_tracker
         for arg_name, arg in event.arguments.items():
             self._add_call_in_edge(event, node, arg_name, arg)
-            for value in self._hidden_referents(object_tracker, arg):
-                self._add_call_in_edge(event, node, arg_name, value)
         
         # If the call is not atomic, we will enter a new scope.
         # Create a nested flow graph for the node.
@@ -487,30 +485,6 @@ class FlowGraphBuilder(HasTraits):
         """
         keys = ('language', 'package', 'id')
         return '/'.join(note[key] for key in keys)
-    
-    def _hidden_referents(self, tracker, obj):
-        """ Get "hidden" referents of an object.
-        
-        The Python container types `tuple`, `list`, and `dict` are not
-        weak-referenceable and hence not trackable by `ObjectTracker`. In fact,
-        not even subclasses of `tuple` are weak-referenceable! Moreover,
-        `Tracer` does not produce trace events for `tuple`, `list`, `dict`, and
-        `set` literals or comprehensions (because `sys.settrace` does not).
-        Consequently the objects belonging to (referenced by) these containers
-        are "hidden" from our system.
-        
-        This method uses the Python garbage collector to find tracked objects
-        referred to by untrackable containers.
-        
-        See also `Tracker.is_trackable()`.
-        """
-        # FIXME: This whole method is a hack. We should find a better way to
-        # solve this problem.
-        if (isinstance(obj, (tuple, list, dict, set, frozenset)) and
-            not ObjectTracker.is_trackable(obj)):
-            for referent in gc.get_referents(obj):
-                if tracker.is_tracked(referent):
-                    yield referent
     
     def _node_name(self, base):
         """ Get node name unique within flow graph, including nested graphs.
