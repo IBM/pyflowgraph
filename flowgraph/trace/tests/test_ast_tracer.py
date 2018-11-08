@@ -166,11 +166,11 @@ class LoggingASTTracer(ASTTracer):
 
     log = List()
 
-    def trace_function(self, func, nargs):
+    def _trace_function(self, func, nargs):
         self.log.append(('function', func, nargs))
         return func
     
-    def trace_argument(self, arg_value, arg_name=None, nstars=0):
+    def _trace_argument(self, arg_value, arg_name=None, nstars=0):
         self.log.append(
             ('*'*nstars + 'arg',
              (arg_name, arg_value) if arg_name else arg_value)

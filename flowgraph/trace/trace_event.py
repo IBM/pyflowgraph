@@ -16,7 +16,9 @@ from __future__ import absolute_import
 
 from collections import OrderedDict
 
-from traitlets import HasTraits, Any, Bool, Instance, Unicode
+from traitlets import HasTraits, Any, Bool, Dict, Instance, Unicode
+
+from .ast_tracer import BoxedValue
 
 
 class TraceEvent(HasTraits):
@@ -58,12 +60,11 @@ class TraceFunctionEvent(TraceEvent):
         return self.module_name + '.' + self.qual_name
 
 
-class TraceValueEvent(TraceEvent):
+class TraceValueEvent(TraceEvent, BoxedValue):
     """ Event pertaining to an expression that produces a value.
+
+    The value produced by the expression is stored in the `value` attribute.
     """
-    
-    # Value produced by expression.
-    value = Any()
 
 
 class TraceCall(TraceFunctionEvent):
@@ -73,6 +74,9 @@ class TraceCall(TraceFunctionEvent):
     # Mapping from argument name to argument value.
     # The ordering of the arguments is that of the function definition.
     arguments = Instance(OrderedDict)
+
+    # Mapping from argument name to argument's parent event, if any.
+    argument_events = Dict()
 
 
 class TraceReturn(TraceFunctionEvent, TraceValueEvent):
@@ -86,6 +90,9 @@ class TraceReturn(TraceFunctionEvent, TraceValueEvent):
     # in Python do), the argument may be mutated from its state in the 
     # corresponding call event.
     arguments = Instance(OrderedDict)
+
+    # Mapping from argument name to argument's parent event, if any.
+    argument_events = Dict()
 
 
 # XXX: Trait change notifications for `return_value` can lead to FutureWarning

@@ -28,7 +28,7 @@ from .ast_transform import AttributesToFunctions, IndexingToFunctions, \
 from .inspect_function import bind_arguments
 from .inspect_name import get_func_module_name, get_func_qual_name
 from .object_tracker import ObjectTracker
-from .trace_event import TraceEvent, TraceCall, TraceReturn
+from .trace_event import TraceEvent, TraceValueEvent, TraceCall, TraceReturn
 
 
 class Tracer(ASTTracer):
@@ -170,8 +170,7 @@ class Tracer(ASTTracer):
         event = self._create_return_event(scope.event, return_value)
         if scope.emit_events:
             self.event = event
-        
-        return return_value
+        return event
     
     # Protected interface
 
@@ -207,6 +206,13 @@ class Tracer(ASTTracer):
         module_name = get_func_module_name(func)
         qual_name = get_func_qual_name(func)
         atomic = module_name != self.__class__.__module__
+
+        # Unbox any trace events carrying argument values.
+        argument_events = {}
+        for arg_name, arg in arguments.items():
+            if isinstance(arg, TraceValueEvent):
+                arguments[arg_name] = arg.value
+                argument_events[arg_name] = arg
             
         # Track every argument that is trackable.
         for arg in arguments.values():
@@ -216,7 +222,7 @@ class Tracer(ASTTracer):
         # Create function call event.
         return TraceCall(tracer=self, function=func, atomic=atomic,
                          module_name=module_name, qual_name=qual_name,
-                         arguments=arguments)
+                         arguments=arguments, argument_events=argument_events)
     
     def _create_return_event(self, call_event, return_value):
         """ Create trace event for function return.
@@ -234,8 +240,9 @@ class Tracer(ASTTracer):
         call = call_event
         return TraceReturn(tracer=self, function=call.function,
                            atomic=call.atomic, module_name=call.module_name,
-                           qual_name=call.qual_name,
-                           arguments=call.arguments, value=return_value)
+                           qual_name=call.qual_name, value=return_value,
+                           arguments=call.arguments,
+                           argument_events=call.argument_events)
     
     def _filter_call(self, func, arguments):
         """ Whether to emit trace events for function call (and return).

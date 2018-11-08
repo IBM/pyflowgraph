@@ -170,6 +170,21 @@ class TestTracer(unittest.TestCase):
             ('name' if six.PY3 else '1', 'foo'),
             ('value' if six.PY3 else '2', env['container'].foo),
         ]))
+    
+    def test_boxed_return(self):
+        """ Can the tracer pass boxed values from a function return?
+        """
+        env = self.trace("objects.bar_from_foo(objects.Foo())")
+        
+        events = self.events
+        self.assertEqual(len(events), 4)
+        self.assertEqual(events[2].qual_name, 'bar_from_foo')
+        self.assertIsInstance(events[2].arguments['foo'], objects.Foo)
+
+        event = events[2].argument_events['foo']
+        self.assertIsInstance(event, TraceReturn)
+        self.assertEqual(event.qual_name, 'Foo')
+        self.assertIs(events[3].argument_events['foo'], event)
 
 
 if __name__ == '__main__':
