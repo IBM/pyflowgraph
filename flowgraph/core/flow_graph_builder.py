@@ -44,6 +44,9 @@ class FlowGraphBuilder(HasTraits):
     
     # Annotator for Python objects and functions.
     annotator = Instance(Annotator, args=())
+
+    # Tracks objects using weak references.
+    object_tracker = Instance(ObjectTracker, args=())
     
     # Whether to store annotated slots for objects on creation or mutation.
     store_slots = Bool(True)
@@ -175,40 +178,49 @@ class FlowGraphBuilder(HasTraits):
             # Sanity check
             raise RuntimeError("Mismatched trace events")
         node = context.node
-                
-        # Update node data for this call.
-        annotation = self.annotator.notate_function(event.function) or {}
-        if not self._update_call_node_for_return(event, annotation, node):
+
+        # Get graph containing this node from context of previous call.
+        context = self._stack[-1]
+        graph = context.graph
+
+        # Special case: If attribute is a bound method, remove the call node.
+        # Method objects are not tracked and the method will be traced when it
+        # is called, so the `getattr` node is redundant.
+        return_value = event.value
+        method_types = (types.MethodType, types.BuiltinMethodType)
+        if event.function is getattr and isinstance(return_value, method_types):
+            graph.remove_node(node)
             return
         
-        # Update event table with node.
-        context = self._stack[-1]
-        context.event_table[event] = (node, '__return__')
-        
         # Set output for return value(s).
-        object_tracker = event.tracer.object_tracker
-        return_value = event.value
         if isinstance(return_value, tuple):
             # Interpret tuples as multiple return values, per Python convention.
             for i, value in enumerate(return_value):
-                value_id = object_tracker.get_id(value)
+                value_id = self.object_tracker.maybe_track(value)
                 if value_id:
                     self._set_object_output_node(
                         event, value, value_id, node, '__return__.%i' % i)
         else:
             # All other objects are treated as a single return value.
-            return_id = object_tracker.get_id(return_value)
+            return_id = self.object_tracker.maybe_track(return_value)
             if return_id:
                 self._set_object_output_node(
                     event, return_value, return_id, node, '__return__')
         
         # Set outputs for mutated arguments.
+        annotation = self.annotator.notate_function(event.function) or {}
         for arg_name, arg in event.arguments.items():
-            arg_id = object_tracker.get_id(arg)
+            arg_id = self.object_tracker.get_id(arg)
             if arg_id and not self.is_pure(event, annotation, arg_name):
                 port = self._mutated_port_name(arg_name)
                 self._set_object_output_node(event, arg, arg_id, node, port)
-    
+        
+        # Update event table with node.
+        context.event_table[event] = (node, '__return__')
+        
+        # Update node and port data for this call.
+        self._update_call_node_for_return(event, annotation, node)
+        
     def _add_call_node(self, event, annotation):
         """ Add a new call node for a call event.
         """
@@ -234,27 +246,20 @@ class FlowGraphBuilder(HasTraits):
         return node
     
     def _update_call_node_for_return(self, event, annotation, node):
-        """ Update a call node for a return event.
+        """ Update node and port data of call node for a return event.
         """
         context = self._stack[-1]
         graph = context.graph
         data = graph.nodes[node]
         
         # Handle special methods (unless overriden by annotation).
-        if event.function is getattr:
-            # If attribute is actually a bound method, remove the call node.
-            # Method objects are not tracked and the method will be traced when
-            # it is called, so the `getattr` node is redundant and useless.
-            if isinstance(event.value, (types.MethodType, types.BuiltinMethodType)):
-                graph.remove_node(node)
-                return False
-            # Otherwise, record the attribute as a slot access.
-            elif not annotation:
+        if not annotation:
+            if event.function is getattr:
+                # Record the attribute access as a slot.
                 self._update_getattr_node_for_return(event, node)
-        
-        elif isinstance(event.function, type) and not annotation:
-            # Record the object initializer as a constructor.
-            self._update_constructor_node_for_return(event, node)
+            elif isinstance(event.function, type):
+                # Record the object initializer as a constructor.
+                self._update_constructor_node_for_return(event, node)
         
         # Add output ports.
         port_names = []
@@ -317,10 +322,12 @@ class FlowGraphBuilder(HasTraits):
     def _add_call_in_edge(self, event, node, arg_name):
         """ Add an incoming edge to a call node.
         """
-        # Get source node and port corresponding to argument, if possible.
+        # Track argument, if possible.
         context = self._stack[-1]
         arg = event.arguments[arg_name]
-        arg_id = event.tracer.object_tracker.get_id(arg)
+        arg_id = self.object_tracker.maybe_track(arg)
+
+        # Get source node and port corresponding to argument, if possible.
         arg_event = event.argument_events.get(arg_name)
         if arg_id:
             # First, check if argument object is tracked.
@@ -436,8 +443,8 @@ class FlowGraphBuilder(HasTraits):
                                   sourceport=port, targetport='self')
             
             # If object is trackable, recursively set it as output.
-            if ObjectTracker.is_trackable(slot_value):
-                slot_id = event.tracer.track_object(slot_value)
+            slot_id = self.object_tracker.maybe_track(slot_value)
+            if slot_id:
                 self._set_object_output_node(
                     event, slot_value, slot_id, slot_node, '__return__')
     
@@ -471,7 +478,7 @@ class FlowGraphBuilder(HasTraits):
             return data
         
         # Add object ID if available.
-        obj_id = event.tracer.object_tracker.get_id(obj)
+        obj_id = self.object_tracker.get_id(obj)
         if obj_id is not None:
             data['id'] = obj_id
         

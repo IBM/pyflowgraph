@@ -89,12 +89,13 @@ class ObjectTracker(HasTraits):
         return True
     
     def track(self, obj):
-        """ Start tracking an object.
+        """ Track an object.
         
-        Returns an ID for the object.
+        Returns an ID for the object. Raises a `ValueError` if object is not
+        trackable.
         """
         if not self.is_trackable(obj):
-            raise TypeError("Cannot track object of type %r" % type(obj))
+            raise ValueError("Cannot track object of type %r" % type(obj))
         
         # Check if object is already being tracked.
         obj_addr = id(obj)
@@ -118,3 +119,13 @@ class ObjectTracker(HasTraits):
         self._ref_map[obj_id] = weakref.ref(obj, obj_gc_callback)
         
         return obj_id
+
+    def maybe_track(self, obj):
+        """ Track an object, if it can be tracked.
+
+        Returns an ID for the object or None.
+        """
+        try:
+            return self.track(obj)
+        except ValueError:
+            return None

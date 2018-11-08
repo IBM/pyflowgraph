@@ -27,7 +27,6 @@ from .ast_transform import AttributesToFunctions, IndexingToFunctions, \
     InplaceOperatorsToFunctions, OperatorsToFunctions
 from .inspect_function import bind_arguments
 from .inspect_name import get_func_module_name, get_func_qual_name
-from .object_tracker import ObjectTracker
 from .trace_event import TraceEvent, TraceValueEvent, TraceCall, TraceReturn
 
 
@@ -44,9 +43,6 @@ class Tracer(ASTTracer):
     
     # The trace call event stack. Read-only.
     stack = List(Instance(TraceCall))
-    
-    # Tracks objects using weak references.
-    object_tracker = Instance(ObjectTracker, args=())
 
     # Scope stack for currently executing code.
     _stack = Instance(deque, ()) # List(Instance(_ScopeItem))
@@ -97,11 +93,6 @@ class Tracer(ASTTracer):
         env.update(self._prepare_env())
         exec(compiled, env)
         return env
-    
-    def track_object(self, obj):
-        """ Start tracking an object.
-        """
-        return self.object_tracker.track(obj)
     
     # AST Tracer interface
 
@@ -213,11 +204,6 @@ class Tracer(ASTTracer):
             if isinstance(arg, TraceValueEvent):
                 arguments[arg_name] = arg.value
                 argument_events[arg_name] = arg
-            
-        # Track every argument that is trackable.
-        for arg in arguments.values():
-            if self.object_tracker.is_trackable(arg):
-                self.track_object(arg)
         
         # Create function call event.
         return TraceCall(tracer=self, function=func, atomic=atomic,
@@ -227,16 +213,6 @@ class Tracer(ASTTracer):
     def _create_return_event(self, call_event, return_value):
         """ Create trace event for function return.
         """
-         # Track the return value(s), if possible.
-        if isinstance(return_value, tuple):
-            # Treat tuple return value as multiple return values.
-            for value in return_value:
-                if self.object_tracker.is_trackable(value):
-                    self.track_object(value)
-        elif self.object_tracker.is_trackable(return_value):
-            self.track_object(return_value)
-
-        # Create function return revent.
         call = call_event
         return TraceReturn(tracer=self, function=call.function,
                            atomic=call.atomic, module_name=call.module_name,

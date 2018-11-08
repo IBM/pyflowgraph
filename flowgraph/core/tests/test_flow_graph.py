@@ -29,7 +29,7 @@ from ..flow_graph import new_flow_graph, flatten, join, \
 from ..graphutil import find_node
 from ..graphml import read_graphml_str, write_graphml_str
 from ..record import record_code
-from ...trace.tracer import Tracer
+from ...trace.object_tracker import ObjectTracker
 from . import objects
 
 
@@ -39,27 +39,27 @@ class TestFlowGraph(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        """ Set up the annotation DB and tracer.
+        """ Set up the annotation DB and object tracker.
         """
         objects_path = Path(objects.__file__).parent
         json_path = objects_path.joinpath('data', 'annotations.json')
         cls.db = AnnotationDB()
         cls.db.load_file(str(json_path))
-        cls.tracer = Tracer()
+        cls.object_tracker = ObjectTracker()
 
     def record(self, code, env=None, **kwargs):
         """ Record block of code for test.
         """
         self.env = env if env is not None else {}
         self.env.update(dict(objects=objects))
-        return record_code(dedent(code), db=self.db, tracer=self.tracer,
-                           env=self.env, **kwargs)
+        return record_code(dedent(code), db=self.db, env=self.env, 
+                                  object_tracker=self.object_tracker, **kwargs)
     
     def id(self, name):
         """ Convenience method to get ID for tracked object.
         """
         obj = self.env[name]
-        return self.tracer.object_tracker.get_id(obj)
+        return self.object_tracker.get_id(obj)
     
     def assert_isomorphic(self, g1, g2, check_id=True):
         """ Assert that two flow graphs are isomorphic.
