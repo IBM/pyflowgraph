@@ -16,6 +16,7 @@ from __future__ import absolute_import
 
 from collections import OrderedDict
 from pathlib2 import Path
+import six
 from textwrap import dedent
 import unittest
 
@@ -116,6 +117,18 @@ class TestFlowGraph(unittest.TestCase):
         target.add_node('1', qual_name='bar_from_foo')
         target.add_edge(inputs, '1', id=self.id('foo'), targetport='foo')
         target.add_edge('1', outputs, id=self.id('bar'), sourceport='__return__')
+        self.assert_isomorphic(actual, target)
+    
+    def test_two_object_flow_untrackable_compose(self):
+        """ Check a two-object flow with untrackable objects passed by
+        composition.
+        """
+        actual = self.record("x = sum(range(5))")
+        target = new_flow_graph()
+        target.add_node('range', qual_name='range')
+        target.add_node('sum', qual_name='sum')
+        target.add_edge('range', 'sum', sourceport='__return__',
+                        targetport='iterable' if six.PY3 else '0')
         self.assert_isomorphic(actual, target)
     
     def test_three_object_flow(self):

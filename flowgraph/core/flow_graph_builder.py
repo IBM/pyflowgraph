@@ -16,8 +16,8 @@ from __future__ import absolute_import
 
 from collections import deque, OrderedDict
 from copy import deepcopy
-import gc
-import inspect
+import types
+from weakref import WeakKeyDictionary
 
 from ipykernel.jsonutil import json_clean
 import networkx as nx
@@ -153,9 +153,8 @@ class FlowGraphBuilder(HasTraits):
         node = self._add_call_node(event, annotation)
         
         # Add edges for function arguments.
-        object_tracker = event.tracer.object_tracker
-        for arg_name, arg in event.arguments.items():
-            self._add_call_in_edge(event, node, arg_name, arg)
+        for arg_name in event.arguments.keys():
+            self._add_call_in_edge(event, node, arg_name)
         
         # If the call is not atomic, we will enter a new scope.
         # Create a nested flow graph for the node.
@@ -181,6 +180,10 @@ class FlowGraphBuilder(HasTraits):
         annotation = self.annotator.notate_function(event.function) or {}
         if not self._update_call_node_for_return(event, annotation, node):
             return
+        
+        # Update event table with node.
+        context = self._stack[-1]
+        context.event_table[event] = (node, '__return__')
         
         # Set output for return value(s).
         object_tracker = event.tracer.object_tracker
@@ -238,11 +241,11 @@ class FlowGraphBuilder(HasTraits):
         data = graph.nodes[node]
         
         # Handle special methods (unless overriden by annotation).
-        if event.name == 'getattr':
+        if event.function is getattr:
             # If attribute is actually a bound method, remove the call node.
             # Method objects are not tracked and the method will be traced when
             # it is called, so the `getattr` node is redundant and useless.
-            if inspect.ismethod(event.value):
+            if isinstance(event.value, (types.MethodType, types.BuiltinMethodType)):
                 graph.remove_node(node)
                 return False
             # Otherwise, record the attribute as a slot access.
@@ -257,8 +260,8 @@ class FlowGraphBuilder(HasTraits):
         port_names = []
         return_value = event.value
         if isinstance(return_value, tuple):
-            for i in range(len(return_value)):
-                port_names.append('__return__.%i' % i)
+            port_names.extend([ '__return__.%i' % i
+                                for i in range(len(return_value)) ])
         elif return_value is not None:
             port_names.append('__return__')
         for arg_name in event.arguments.keys():
@@ -311,40 +314,48 @@ class FlowGraphBuilder(HasTraits):
         else:
             data['construct'] = True
     
-    def _add_call_in_edge(self, event, node, arg_name, arg):
+    def _add_call_in_edge(self, event, node, arg_name):
         """ Add an incoming edge to a call node.
         """
-        # Only proceed if the argument is tracked.
+        # Get source node and port corresponding to argument, if possible.
+        context = self._stack[-1]
+        arg = event.arguments[arg_name]
         arg_id = event.tracer.object_tracker.get_id(arg)
-        if not arg_id:
-            return
+        arg_event = event.argument_events.get(arg_name)
+        if arg_id:
+            # First, check if argument object is tracked.
+            src, src_port = self._get_object_output_node(arg_id)
+        elif arg_event and arg_event in context.event_table:
+            # If that fails, fall back to static analysis, via the event table.
+            src, src_port = context.event_table[arg_event]
+        else:
+            src, src_port = None, None
         
         # Add edge if the argument has a known output node.
-        context = self._stack[-1]
-        graph = context.graph
-        src, src_port = self._get_object_output_node(arg_id)
         if src is not None:
-            self._add_object_edge(arg, arg_id, src, node,
+            self._add_object_edge(arg, src, node, obj_id=arg_id,
                                   sourceport=src_port, targetport=arg_name)
         
-        # Otherwise, mark the argument as an unknown input.
-        else:
+        # Otherwise, mark a tracked argument as an unknown input.
+        elif arg_id:
             self._add_object_input_node(arg, arg_id, node, arg_name)
     
-    def _add_object_edge(self, obj, obj_id, source, target, 
-                         sourceport=None, targetport=None):
+    def _add_object_edge(self, obj, source, target, 
+                         obj_id=None, sourceport=None, targetport=None):
         """ Add an edge corresponding to an object.
         """
         context = self._stack[-1]
         graph = context.graph
-        note = self.annotator.notate_object(obj)
-        data = { 'id': obj_id }
-        if note:
-            data['annotation'] = self._annotation_key(note)
+        data = {}
+        if obj_id is not None:
+            data['id'] = obj_id
         if sourceport is not None:
             data['sourceport'] = sourceport
         if targetport is not None:
             data['targetport'] = targetport
+        note = self.annotator.notate_object(obj)
+        if note:
+            data['annotation'] = self._annotation_key(note)
         graph.add_edge(source, target, **data)
     
     def _add_object_input_node(self, obj, obj_id, node, port):
@@ -353,7 +364,8 @@ class FlowGraphBuilder(HasTraits):
         context = self._stack[-1]
         graph = context.graph
         input_node = graph.graph['input_node']
-        self._add_object_edge(obj, obj_id, input_node, node, targetport=port)
+        self._add_object_edge(obj, input_node, node, obj_id=obj_id,
+                              targetport=port)
     
     def _get_object_output_node(self, obj_id):
         """ Get the node/port of which the object is an output, if any. 
@@ -383,7 +395,8 @@ class FlowGraphBuilder(HasTraits):
         
         # Set new output.
         output_table[obj_id] = (node, port)
-        self._add_object_edge(obj, obj_id, node, output_node, sourceport=port)
+        self._add_object_edge(obj, node, output_node, obj_id=obj_id,
+                              sourceport=port)
         
         # The object has been created or mutated, so fetch its slots.
         if self.store_slots:
@@ -419,7 +432,7 @@ class FlowGraphBuilder(HasTraits):
                 ])
             }
             graph.add_node(slot_node, **slot_node_data)
-            self._add_object_edge(obj, obj_id, node, slot_node,
+            self._add_object_edge(obj, node, slot_node, obj_id=obj_id,
                                   sourceport=port, targetport='self')
             
             # If object is trackable, recursively set it as output.
@@ -520,15 +533,23 @@ class _CallContext(HasTraits):
     # Flow graph nested in node, if any.
     graph = Instance(nx.MultiDiGraph, allow_none=True)
     
-    # Output table for the flow graph.
+    # Output table: mapping from object ID to (node, output port) pair.
     #
-    # At any given time during execution, an object is the output of at most one
-    # node, i.e., there is at most one incoming edge to the special output node
-    # that carries a particular object. We maintain this mapping as an auxiliary
-    # data structure called the "output table". It is logically superfluous--the
-    # same information is captured by the graph topology--but it improves
-    # efficiency by allowing constant-time lookup.
+    # At any given time during execution, an object is the output of at most
+    # one node, i.e., there is at most one incoming edge to the special output
+    # node that carries a particular object. We maintain this mapping as an
+    # auxiliary data structure called the "output table". It is logically
+    # superfluous--the same information is captured by the graph topology--but
+    # it improves efficiency by allowing constant-time lookup.
     output_table = Dict()
+
+    # Event table: mapping from trace event to (node, output port) pair.
+    #
+    # As a complement to object tracking, which doesn't always work, we
+    # maintain a correspondence between `TraceValueEvent`s and their outputs.
+    # The dictionary has weak reference keys because we want to allow the trace
+    # events to be garbage collected once they've passed through the system.
+    event_table = Instance(WeakKeyDictionary, ())
 
 
 class _IOSlots(object):

@@ -91,9 +91,6 @@ class TraceReturn(TraceFunctionEvent, TraceValueEvent):
     # corresponding call event.
     arguments = Instance(OrderedDict)
 
-    # Mapping from argument name to argument's parent event, if any.
-    argument_events = Dict()
-
 
 # XXX: Trait change notifications for `return_value` can lead to FutureWarning
 # from numpy: http://stackoverflow.com/questions/28337085

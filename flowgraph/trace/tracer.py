@@ -241,16 +241,15 @@ class Tracer(ASTTracer):
         return TraceReturn(tracer=self, function=call.function,
                            atomic=call.atomic, module_name=call.module_name,
                            qual_name=call.qual_name, value=return_value,
-                           arguments=call.arguments,
-                           argument_events=call.argument_events)
+                           arguments=call.arguments)
     
     def _filter_call(self, func, arguments):
         """ Whether to emit trace events for function call (and return).
         """
         if func is getattr:
             # Ignore attribute access on modules.
-            first = next(iter(arguments.values()))
-            return not isinstance(first, types.ModuleType)
+            first_arg = next(iter(arguments.values()))
+            return not isinstance(first_arg, types.ModuleType)
 
         return True
 

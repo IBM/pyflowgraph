@@ -184,7 +184,6 @@ class TestTracer(unittest.TestCase):
         event = events[2].argument_events['foo']
         self.assertIsInstance(event, TraceReturn)
         self.assertEqual(event.qual_name, 'Foo')
-        self.assertIs(events[3].argument_events['foo'], event)
 
 
 if __name__ == '__main__':
