@@ -264,7 +264,7 @@ class FlowGraphBuilder(HasTraits):
         # Add output ports.
         port_names = []
         return_value = event.value
-        if isinstance(return_value, tuple):
+        if isinstance(return_value, tuple) and event.function is not getattr:
             port_names.extend([ '__return__.%i' % i
                                 for i in range(len(return_value)) ])
         elif return_value is not None:
