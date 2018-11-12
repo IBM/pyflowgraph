@@ -84,7 +84,7 @@ class TestInspectNames(unittest.TestCase):
     
     @unittest.skipIf(np is None, "requires numpy")
     def test_get_numpy_builtin_method_names(self):
-        """ Can get the module and qual name of a numpy builtin method?
+        """ Can get the module and qual name of a NumPy builtin method?
         """
         # Note: `numpy.random.rand` is a method bound to `mtrand.RandomState`.
         # Try running `import numpy, mtrand`.
@@ -93,7 +93,7 @@ class TestInspectNames(unittest.TestCase):
     
     @unittest.skipIf(np is None, "requires numpy")
     def test_get_ufunc_names(self):
-        """ Can we get the module and qual name of a numpy ufunc?
+        """ Can we get the module and qual name of a NumPy ufunc?
         """
         self.assertEqual(get_func_module_name(np.sin), 'numpy')
         self.assertEqual(get_func_qual_name(np.sin), 'sin')
