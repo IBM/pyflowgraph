@@ -110,7 +110,7 @@ class FlowGraphBuilder(HasTraits):
         return True
     
     def is_pure(self, event, annotation, arg_name):
-        """ Is the call event pure with respect to the given argument?
+        """ Is the function call event pure with respect to the given argument?
         
         In a pure functional language (like Haskell) or a language with
         copy-on-modify semantics (like R), this would always be True, but in
@@ -142,6 +142,18 @@ class FlowGraphBuilder(HasTraits):
         outputs = annotation.get('outputs', [])
         slots = _IOSlots(event)
         return not any(arg_name == slots._name(obj['slot']) for obj in outputs)
+    
+    def is_multiple_return(self, event):
+        """ Is the function return event a multiple value return?
+
+        Like many programming languages, Python treats function inputs and
+        outputs asymmetrically. A function can have many arguments, but only
+        one return value. Multiple return values are represented implicitly by
+        returning a tuple. We treat tuples as multiple returns, subject to a
+        few special exceptions.
+        """
+        return isinstance(event.value, tuple) and \
+            event.function not in (getattr, extra_operator.__tuple__)
     
     # Protected interface
             
@@ -194,7 +206,7 @@ class FlowGraphBuilder(HasTraits):
             return
         
         # Set output for return value(s).
-        if isinstance(return_value, tuple):
+        if self.is_multiple_return(event):
             # Interpret tuples as multiple return values, per Python convention.
             for i, value in enumerate(return_value):
                 value_id = self.object_tracker.maybe_track(value)
@@ -265,8 +277,7 @@ class FlowGraphBuilder(HasTraits):
         # Add output ports.
         port_names = []
         return_value = event.value
-        if isinstance(return_value, tuple) and \
-                event.function not in (getattr, extra_operator.__tuple__):
+        if self.is_multiple_return(event):
             port_names.extend([ '__return__.%i' % i
                                 for i in range(len(return_value)) ])
         elif return_value is not None:
