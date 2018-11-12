@@ -26,8 +26,6 @@ except ImportError:
     # Python 2.7 to 3.2
     from funcsigs import signature
 
-from . import operator as extra_operator
-
 
 def bind_arguments(fun, *args, **kwargs):
     """ Bind arguments to function or method.
@@ -36,11 +34,6 @@ def bind_arguments(fun, *args, **kwargs):
     `inspect.signature`, the `self` parameter of bound instance methods is
     included as an argument.
     """
-    if getattr(fun, '__module__', None) == extra_operator.__name__:
-        # Case 0: Treat certain special functions as builtins, in particular
-        # ignoring *args and **kwargs.
-        return fake_bind_arguments(*args, **kwargs)
-
     if inspect.ismethod(fun) and not inspect.isclass(fun.__self__):
         # Case 1: Bound instance method, implemented in Python.
         # Reduce to Case 2 below because `Signature.bind()`` excludes `self`
@@ -57,8 +50,7 @@ def bind_arguments(fun, *args, **kwargs):
         pass
     else:
         # Case 2, cont.: If we got a signature, use it and exit.
-        bound = sig.bind(*args, **kwargs)
-        return bound.arguments
+        return bind_arguments_with_signature(sig, *args, **kwargs)
     
     fun_self = getattr(fun, '__self__', None)
     if fun_self is not None and not isinstance(fun_self, types.ModuleType):
@@ -67,11 +59,35 @@ def bind_arguments(fun, *args, **kwargs):
         args = (fun_self,) + args
 
     # Case 4: Callable implemented in C ("builtin")
-    return fake_bind_arguments(*args, **kwargs)
+    return bind_arguments_without_signature(*args, **kwargs)
 
 
-def fake_bind_arguments(*args, **kwargs):
-    """ Bind function arguments without any function or signature object.
+def bind_arguments_with_signature(sig, *args, **kwargs):
+    """ Bind function arguments using a `Signature` object.
+    """
+    bound = sig.bind(*args, **kwargs)
+    arguments = bound.arguments
+
+    # Expand variable arguments (*args) and variable keywords (**kwargs).
+    for param in sig.parameters.values():
+        if param.kind == param.VAR_POSITIONAL:
+            try:
+                value = arguments.pop(param.name)
+            except KeyError: pass
+            else:
+                arguments.update(bind_arguments_without_signature(*value))
+        elif param.kind == param.VAR_KEYWORD:
+            try:
+                value = arguments.pop(param.name)
+            except KeyError: pass
+            else:
+                arguments.update(value)
+
+    return arguments
+
+
+def bind_arguments_without_signature(*args, **kwargs):
+    """ Bind function arguments in the absence of a signature.
 
     Useful for builtin functions, whose signatures simply cannot be inspected.
     """

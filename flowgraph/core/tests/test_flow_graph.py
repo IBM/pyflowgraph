@@ -530,15 +530,17 @@ class TestFlowGraph(unittest.TestCase):
                 'annotation': 'python/builtins/int',
                 'value': 2,
             }),
-            ('args', {
-                'argname': 'args',
+            ('0', {
+                'argname': '0',
                 'portkind': 'input',
-                'value': (3,),
+                'annotation': 'python/builtins/int',
+                'value': 3,
             }),
-            ('kw', {
-                'argname': 'kw',
+            ('w', {
+                'argname': 'w',
                 'portkind': 'input',
-                'value': {'w': 4},
+                'annotation': 'python/builtins/int',
+                'value': 4,
             })
         ])
         self.assertEqual(actual, desired)

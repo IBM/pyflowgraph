@@ -56,6 +56,27 @@ class TestInspectFunctions(unittest.TestCase):
         x = [1,2,3]
         args = bind_arguments(x.append, 4)
         self.assertEqual(args, OrderedDict([('0',x), ('1',4)]))
+    
+    def test_bind_var_args(self):
+        """ Can we bind *args of a function?
+        """
+        args = bind_arguments(function_with_var_args, 1, 2, 3)
+        self.assertEqual(args, OrderedDict([('0',1), ('1',2), ('2',3)]))
+    
+    def test_bind_var_kwargs(self):
+        """ Can we bind **kwargs of a function?
+        """
+        args = bind_arguments(function_with_var_kwargs, x=1, y=2)
+        self.assertEqual(args, OrderedDict([('x',1), ('y',2)]))
+
+
+# Test data
+
+def function_with_var_args(*args):
+    pass
+
+def function_with_var_kwargs(**kwargs):
+    pass
 
 
 if __name__ == '__main__':
