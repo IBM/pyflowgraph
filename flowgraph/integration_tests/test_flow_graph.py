@@ -58,6 +58,25 @@ class IntegrationTestFlowGraph(unittest.TestCase):
         self.assertTrue(matcher.is_isomorphic())
         return matcher.mapping
     
+    def assert_valid_ports(self, graph):
+        """ Assert that edges in flow graph have valid source and target ports.
+
+        Downstream tools expect this consistency condition to hold.
+        """
+        input_node = graph.graph['input_node']
+        output_node = graph.graph['output_node']
+        for src, tgt, data in graph.edges(data=True):
+            if src != input_node:
+                src_port = data['sourceport']
+                ports = graph.node[src]['ports']
+                self.assertIn(src_port, ports)
+                self.assertEqual(ports[src_port]['portkind'], 'output')
+            if tgt != output_node:
+                tgt_port = data['targetport']
+                ports = graph.node[tgt]['ports']
+                self.assertIn(tgt_port, ports)
+                self.assertEqual(ports[tgt_port]['portkind'], 'input')
+    
     def record_script(self, name, env=None, save=True):
         """ Execute and record a test script.
         """
@@ -72,7 +91,51 @@ class IntegrationTestFlowGraph(unittest.TestCase):
             graphml = flow_graph_to_graphml(graph, simplify_outputs=True)
             write_graphml(graphml, outname)
         
+        # Check consistency of node ports with edge source and target ports.
+        self.assert_valid_ports(graph)
+        
         return graph
+    
+    def test_numpy_reshape(self):
+        """ Reshape a NumPy array.
+        """
+        graph = self.record_script("numpy_reshape_array")
+        graph.remove_node(graph.graph['output_node'])
+
+        target = new_flow_graph()
+        target.remove_node(target.graph['output_node'])
+        target.add_node('rand', qual_name='RandomState.rand')
+        target.add_node('arange', qual_name='arange')
+        target.add_node('shape', qual_name='getattr', slot='shape',
+                        annotation='python/numpy/ndarray')
+        target.add_node('reshape', qual_name='ndarray.reshape')
+        target.add_edge('rand', 'shape', sourceport='__return__', targetport='0',
+                        annotation='python/numpy/ndarray')
+        target.add_edge('arange', 'reshape', sourceport='__return__', targetport='0',
+                        annotation='python/numpy/ndarray')
+        target.add_edge('shape', 'reshape', sourceport='__return__', targetport='1')
+        self.assert_isomorphic(graph, target)
+    
+    def test_numpy_slice(self):
+        """ Extended slice of NumPy array.
+        """
+        graph = self.record_script("numpy_slice_array")
+        graph.remove_node(graph.graph['output_node'])
+        
+        target = new_flow_graph()
+        target.remove_node(target.graph['output_node'])
+        target.add_node('rand', qual_name='RandomState.rand')
+        target.add_node('slice', qual_name='slice')
+        target.add_node('extslice', qual_name='__tuple__')
+        target.add_node('getitem', qual_name='getitem')
+        target.add_node('gt', qual_name='gt')
+        target.add_edge('rand', 'getitem', sourceport='__return__', targetport='0',
+                        annotation='python/numpy/ndarray')
+        target.add_edge('slice', 'extslice', sourceport='__return__', targetport='0')
+        target.add_edge('extslice', 'getitem', sourceport='__return__', targetport='1')
+        target.add_edge('getitem', 'gt', sourceport='__return__', targetport='0',
+                        annotation='python/numpy/ndarray')
+        self.assert_isomorphic(graph, target)
     
     def test_pandas_read_sql(self):
         """ Read SQL table using pandas and SQLAlchemy.

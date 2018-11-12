@@ -19,13 +19,15 @@ import six
 from textwrap import dedent
 import unittest
 
-from ..ast_trace import TraceFunctionCalls
+from traitlets import List
+
+from ..ast_tracer import ASTTracer, TraceFunctionCalls
 
 # Imports for test code only.
 from fractions import Fraction
 
 
-class TestASTTrace(unittest.TestCase):
+class TestASTTracer(unittest.TestCase):
     """ Test cases for abstract syntax tree (AST) tracing transformers.
     """
 
@@ -33,34 +35,14 @@ class TestASTTrace(unittest.TestCase):
         """ Reset trace state for test.
         """
         self.history = []
-
-    def trace_function(self, func, nargs):
-        """ Record function evaluation (not function call!).
-        """
-        self.history.append(('function', func, nargs))
-        return func
-    
-    def trace_argument(self, arg_value, arg_name=None, nstars=0):
-        """ Record argument evaluation.
-        """
-        self.history.append(
-            ('*'*nstars + 'arg',
-             (arg_name, arg_value) if arg_name else arg_value)
-        )
-        return arg_value
-    
-    def trace_return(self, return_value):
-        """ Record function return.
-        """
-        self.history.append(('return', return_value))
-        return return_value
+        self.tracer = LoggingASTTracer(log=self.history)
 
     def exec_ast(self, node, env=None):
         """ Execute AST node in environment.
         """
         self.env = env = env or {}
         env.update(globals())
-        env['__trace__'] = self
+        env['__trace__'] = self.tracer
 
         ast.fix_missing_locations(node)
         code = compile(node, filename='<ast>', mode='exec')
@@ -178,6 +160,26 @@ class TestASTTrace(unittest.TestCase):
             ('**arg', { 'denominator': 7 }),
             ('return', Fraction(3,7)),
         ])
+
+
+class LoggingASTTracer(ASTTracer):
+
+    log = List()
+
+    def _trace_function(self, func, nargs):
+        self.log.append(('function', func, nargs))
+        return func
+    
+    def _trace_argument(self, arg_value, arg_name=None, nstars=0):
+        self.log.append(
+            ('*'*nstars + 'arg',
+             (arg_name, arg_value) if arg_name else arg_value)
+        )
+        return arg_value
+    
+    def _trace_return(self, return_value):
+        self.log.append(('return', return_value))
+        return return_value
 
 
 if __name__ == '__main__':

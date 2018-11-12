@@ -20,7 +20,7 @@ setup_args = {
         'jsonpickle',
         'click',
         'networkx>=2.0',
-        'cachetools>=2.0.0',
+        'cachetools==2.1.0',
         'blitzdb>=0.3',
         'sqlalchemy',
         'ipykernel>=4.3.0',

@@ -20,8 +20,7 @@ import unittest
 
 from astor import to_source
 
-from ..ast_transform import AttributesToFunctions, IndexingToFunctions, \
-    InplaceOperatorsToFunctions, OperatorsToFunctions
+from ..ast_transform import *
 
 
 class TestASTTransform(unittest.TestCase):
@@ -203,7 +202,41 @@ class TestASTTransform(unittest.TestCase):
         """
         node = ast.parse('x[:n] += 1')
         IndexingToFunctions().visit(node)
-        result = 'operator.setitem(x, slice(n), operator.iadd(operator.getitem(x, slice(n)), 1))'
+        result = 'operator.setitem(x, slice(n), '\
+            'operator.iadd(operator.getitem(x, slice(n)), 1))'
+        self.assertEqual(to_source(node).strip(), result)
+    
+    def test_list_literal(self):
+        """ Can we replace a list literal with a function call?
+        """
+        node = ast.parse('[1,2,3]')
+        ContainerLiteralsToFunction().visit(node)
+        result = 'operator.__list__(1, 2, 3)'
+        self.assertEqual(to_source(node).strip(), result)
+    
+    def test_tuple_literal(self):
+        """ Can we replace a tuple literal with a function call?
+        """
+        node = ast.parse('(1,2,3)')
+        ContainerLiteralsToFunction().visit(node)
+        result = 'operator.__tuple__(1, 2, 3)'
+        self.assertEqual(to_source(node).strip(), result)
+    
+    def test_set_literal(self):
+        """ Can we replace a set literal with a function call?
+        """
+        node = ast.parse('{1,2,3}')
+        ContainerLiteralsToFunction().visit(node)
+        result = 'operator.__set__(1, 2, 3)'
+        self.assertEqual(to_source(node).strip(), result)
+    
+    def test_dict_literal(self):
+        """ Can we replace a dictionary literal whose keys are strings with a
+        function call?
+        """
+        node = ast.parse("{'x': 1, 'y': 2}")
+        ContainerLiteralsToFunction().visit(node)
+        result = 'dict(x=1, y=2)'
         self.assertEqual(to_source(node).strip(), result)
 
 

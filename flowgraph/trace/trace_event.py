@@ -16,7 +16,9 @@ from __future__ import absolute_import
 
 from collections import OrderedDict
 
-from traitlets import HasTraits, Any, Bool, Instance, Unicode
+from traitlets import HasTraits, Any, Bool, Dict, Instance, Unicode
+
+from .ast_tracer import BoxedValue
 
 
 class TraceEvent(HasTraits):
@@ -25,55 +27,69 @@ class TraceEvent(HasTraits):
     
     # Tracer that created this event.
     tracer = Instance('flowgraph.trace.tracer.Tracer')
+
+
+class TraceFunctionEvent(TraceEvent):
+    """ Event pertaining to a function call.
+    """
     
-    # The function object that was called.
+    # The function object (any callable).
     function = Any()
     
-    # Name of module containing the definition of the called function.
+    # Name of module containing the definition of the function.
     # E.g., 'collections' or 'flowgraph.userlib.data.read_data'.
     module_name = Unicode()
     
-    # Qualified name of the called function.
+    # Qualified name of function.
     # E.g., 'map' or 'OrderedDict.__init__'.
     qual_name = Unicode()
     
-    # Whether the function call is "atomic", i.e., its body will not be traced.
+    # Whether the function is "atomic", i.e., its body will not be traced.
     atomic = Bool()
     
     @property
     def name(self):
-        """ Short name of the called function.
+        """ Short name of function.
         """
         return self.qual_name.split('.')[-1]
     
     @property
     def full_name(self):
-        """ Full name of the called function.
+        """ Full name of function.
         """
         return self.module_name + '.' + self.qual_name
 
 
-class TraceCall(TraceEvent):
-    """ Event generated at the beginning of a function call.
+class TraceValueEvent(TraceEvent, BoxedValue):
+    """ Event pertaining to an expression that produces a value.
+
+    The value produced by the expression is stored in the `value` attribute.
+    """
+
+
+class TraceCall(TraceFunctionEvent):
+    """ Event generated immediately before a function is called.
     """
     
-    # Map: argument name -> argument value.
+    # Mapping from argument name to argument value.
     # The ordering of the arguments is that of the function definition.
     arguments = Instance(OrderedDict)
 
+    # Mapping from argument name to argument's parent event, if any.
+    argument_events = Dict()
 
-class TraceReturn(TraceEvent):
-    """ Event generated when a function returns.
+
+class TraceReturn(TraceFunctionEvent, TraceValueEvent):
+    """ Event generated immediately after a function returns.
+
+    The return value is stored in the `value` attribute.
     """
     
-    # Map: argument name -> argument value.
+    # Map from argument name to argument value.
     # Warning: if an argument has pass-by-reference semantics (as most types
     # in Python do), the argument may be mutated from its state in the 
     # corresponding call event.
     arguments = Instance(OrderedDict)
-    
-    # Return value of function.
-    return_value = Any()
 
 
 # XXX: Trait change notifications for `return_value` can lead to FutureWarning

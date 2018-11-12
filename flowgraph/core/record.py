@@ -23,7 +23,7 @@ import os
 
 from traitlets import HasTraits, Instance
 
-from flowgraph.trace.tracer import Tracer
+from ..trace.tracer import Tracer
 from .flow_graph import flow_graph_to_graphml
 from .flow_graph_builder import FlowGraphBuilder
 from .graphml import write_graphml
@@ -31,7 +31,7 @@ from .remote_annotation_db import RemoteAnnotationDB
 
 
 def record_code(code, codename=None, out=None, env=None, cwd=None, db=None,
-                tracer=None, simplify_outputs=True, **kwargs):
+                simplify_outputs=True, **kwargs):
     """ Execute and record Python code.
 
     Parameters
@@ -55,9 +55,6 @@ def record_code(code, codename=None, out=None, env=None, cwd=None, db=None,
     db : AnnotationDB (optional)
         Annotation database, by default the standard remoate annotation DB
     
-    tracer : Tracer (optional)
-        Execution tracer, which includes the object tracker
-    
     simplify_outputs : bool (optional)
         Whether to simplify outputs when writing GraphML
 
@@ -74,7 +71,7 @@ def record_code(code, codename=None, out=None, env=None, cwd=None, db=None,
         event = changed['new']
         if event:
             builder.push_event(event)
-    tracer = tracer or Tracer()
+    tracer = Tracer()
 
     # Evaluate the code in the right working directory and environment.
     if cwd is not None:

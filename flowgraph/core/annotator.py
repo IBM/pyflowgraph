@@ -24,7 +24,7 @@ from traitlets import HasTraits, Dict, Instance
 
 from .annotation_db import AnnotationDB
 from .remote_annotation_db import RemoteAnnotationDB
-from ..trace.inspect_names import get_class_module_name, \
+from ..trace.inspect_name import get_class_module_name, \
     get_class_full_name, get_func_full_name
 
 

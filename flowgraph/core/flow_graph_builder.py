@@ -16,15 +16,16 @@ from __future__ import absolute_import
 
 from collections import deque, OrderedDict
 from copy import deepcopy
-import gc
-import inspect
+import types
+from weakref import WeakKeyDictionary
 
 from ipykernel.jsonutil import json_clean
 import networkx as nx
 from traitlets import HasTraits, Bool, Dict, Instance, Unicode, default
 
 from flowgraph.kernel.slots import get_slot
-from flowgraph.trace.inspect_names import get_class_module_name, \
+from flowgraph.trace import operator as extra_operator
+from flowgraph.trace.inspect_name import get_class_module_name, \
     get_class_qual_name
 from flowgraph.trace.object_tracker import ObjectTracker
 from flowgraph.trace.trace_event import TraceEvent, TraceCall, TraceReturn
@@ -44,6 +45,9 @@ class FlowGraphBuilder(HasTraits):
     
     # Annotator for Python objects and functions.
     annotator = Instance(Annotator, args=())
+
+    # Tracks objects using weak references.
+    object_tracker = Instance(ObjectTracker, args=())
     
     # Whether to store annotated slots for objects on creation or mutation.
     store_slots = Bool(True)
@@ -106,7 +110,7 @@ class FlowGraphBuilder(HasTraits):
         return True
     
     def is_pure(self, event, annotation, arg_name):
-        """ Is the call event pure with respect to the given argument?
+        """ Is the function call event pure with respect to the given argument?
         
         In a pure functional language (like Haskell) or a language with
         copy-on-modify semantics (like R), this would always be True, but in
@@ -139,6 +143,18 @@ class FlowGraphBuilder(HasTraits):
         slots = _IOSlots(event)
         return not any(arg_name == slots._name(obj['slot']) for obj in outputs)
     
+    def is_multiple_return(self, event):
+        """ Is the function return event a multiple value return?
+
+        Like many programming languages, Python treats function inputs and
+        outputs asymmetrically. A function can have many arguments, but only
+        one return value. Multiple return values are represented implicitly by
+        returning a tuple. We treat tuples as multiple returns, subject to a
+        few special exceptions.
+        """
+        return isinstance(event.value, tuple) and \
+            event.function not in (getattr, extra_operator.__tuple__)
+    
     # Protected interface
             
     def _push_call_event(self, event):
@@ -153,11 +169,8 @@ class FlowGraphBuilder(HasTraits):
         node = self._add_call_node(event, annotation)
         
         # Add edges for function arguments.
-        object_tracker = event.tracer.object_tracker
-        for arg_name, arg in event.arguments.items():
-            self._add_call_in_edge(event, node, arg_name, arg)
-            for value in self._hidden_referents(object_tracker, arg):
-                self._add_call_in_edge(event, node, arg_name, value)
+        for arg_name in event.arguments.keys():
+            self._add_call_in_edge(event, node, arg_name)
         
         # If the call is not atomic, we will enter a new scope.
         # Create a nested flow graph for the node.
@@ -178,36 +191,49 @@ class FlowGraphBuilder(HasTraits):
             # Sanity check
             raise RuntimeError("Mismatched trace events")
         node = context.node
-                
-        # Update node data for this call.
-        annotation = self.annotator.notate_function(event.function) or {}
-        if not self._update_call_node_for_return(event, annotation, node):
+
+        # Get graph containing this node from context of previous call.
+        context = self._stack[-1]
+        graph = context.graph
+
+        # Special case: If attribute is a bound method, remove the call node.
+        # Method objects are not tracked and the method will be traced when it
+        # is called, so the `getattr` node is redundant.
+        return_value = event.value
+        method_types = (types.MethodType, types.BuiltinMethodType)
+        if event.function is getattr and isinstance(return_value, method_types):
+            graph.remove_node(node)
             return
         
         # Set output for return value(s).
-        object_tracker = event.tracer.object_tracker
-        return_value = event.return_value
-        if isinstance(return_value, tuple):
+        if self.is_multiple_return(event):
             # Interpret tuples as multiple return values, per Python convention.
             for i, value in enumerate(return_value):
-                value_id = object_tracker.get_id(value)
+                value_id = self.object_tracker.maybe_track(value)
                 if value_id:
                     self._set_object_output_node(
                         event, value, value_id, node, '__return__.%i' % i)
         else:
             # All other objects are treated as a single return value.
-            return_id = object_tracker.get_id(return_value)
+            return_id = self.object_tracker.maybe_track(return_value)
             if return_id:
                 self._set_object_output_node(
                     event, return_value, return_id, node, '__return__')
         
         # Set outputs for mutated arguments.
+        annotation = self.annotator.notate_function(event.function) or {}
         for arg_name, arg in event.arguments.items():
-            arg_id = object_tracker.get_id(arg)
+            arg_id = self.object_tracker.get_id(arg)
             if arg_id and not self.is_pure(event, annotation, arg_name):
                 port = self._mutated_port_name(arg_name)
                 self._set_object_output_node(event, arg, arg_id, node, port)
-    
+        
+        # Update event table with node.
+        context.event_table[event] = (node, '__return__')
+        
+        # Update node and port data for this call.
+        self._update_call_node_for_return(event, annotation, node)
+        
     def _add_call_node(self, event, annotation):
         """ Add a new call node for a call event.
         """
@@ -233,34 +259,27 @@ class FlowGraphBuilder(HasTraits):
         return node
     
     def _update_call_node_for_return(self, event, annotation, node):
-        """ Update a call node for a return event.
+        """ Update node and port data of call node for a return event.
         """
         context = self._stack[-1]
         graph = context.graph
         data = graph.nodes[node]
         
         # Handle special methods (unless overriden by annotation).
-        if event.name == 'getattr':
-            # If attribute is actually a bound method, remove the call node.
-            # Method objects are not tracked and the method will be traced when
-            # it is called, so the `getattr` node is redundant and useless.
-            if inspect.ismethod(event.return_value):
-                graph.remove_node(node)
-                return False
-            # Otherwise, record the attribute as a slot access.
-            elif not annotation:
+        if not annotation:
+            if event.function is getattr:
+                # Record the attribute access as a slot.
                 self._update_getattr_node_for_return(event, node)
-        
-        elif isinstance(event.function, type) and not annotation:
-            # Record the object initializer as a constructor.
-            self._update_constructor_node_for_return(event, node)
+            elif isinstance(event.function, type):
+                # Record the object initializer as a constructor.
+                self._update_constructor_node_for_return(event, node)
         
         # Add output ports.
         port_names = []
-        return_value = event.return_value
-        if isinstance(return_value, tuple):
-            for i in range(len(return_value)):
-                port_names.append('__return__.%i' % i)
+        return_value = event.value
+        if self.is_multiple_return(event):
+            port_names.extend([ '__return__.%i' % i
+                                for i in range(len(return_value)) ])
         elif return_value is not None:
             port_names.append('__return__')
         for arg_name in event.arguments.keys():
@@ -304,7 +323,7 @@ class FlowGraphBuilder(HasTraits):
         """
         context = self._stack[-1]
         data = context.graph.nodes[node]
-        note = self.annotator.notate_object(event.return_value)
+        note = self.annotator.notate_object(event.value)
         if note:
             data.update({
                 'annotation': self._annotation_key(note),
@@ -313,40 +332,50 @@ class FlowGraphBuilder(HasTraits):
         else:
             data['construct'] = True
     
-    def _add_call_in_edge(self, event, node, arg_name, arg):
+    def _add_call_in_edge(self, event, node, arg_name):
         """ Add an incoming edge to a call node.
         """
-        # Only proceed if the argument is tracked.
-        arg_id = event.tracer.object_tracker.get_id(arg)
-        if not arg_id:
-            return
+        # Track argument, if possible.
+        context = self._stack[-1]
+        arg = event.arguments[arg_name]
+        arg_id = self.object_tracker.maybe_track(arg)
+
+        # Get source node and port corresponding to argument, if possible.
+        arg_event = event.argument_events.get(arg_name)
+        if arg_id:
+            # First, check if argument object is tracked.
+            src, src_port = self._get_object_output_node(arg_id)
+        elif arg_event and arg_event in context.event_table:
+            # If that fails, fall back to static analysis, via the event table.
+            src, src_port = context.event_table[arg_event]
+        else:
+            src, src_port = None, None
         
         # Add edge if the argument has a known output node.
-        context = self._stack[-1]
-        graph = context.graph
-        src, src_port = self._get_object_output_node(arg_id)
         if src is not None:
-            self._add_object_edge(arg, arg_id, src, node,
+            self._add_object_edge(arg, src, node, obj_id=arg_id,
                                   sourceport=src_port, targetport=arg_name)
         
-        # Otherwise, mark the argument as an unknown input.
-        else:
+        # Otherwise, mark a tracked argument as an unknown input.
+        elif arg_id:
             self._add_object_input_node(arg, arg_id, node, arg_name)
     
-    def _add_object_edge(self, obj, obj_id, source, target, 
-                         sourceport=None, targetport=None):
+    def _add_object_edge(self, obj, source, target, 
+                         obj_id=None, sourceport=None, targetport=None):
         """ Add an edge corresponding to an object.
         """
         context = self._stack[-1]
         graph = context.graph
-        note = self.annotator.notate_object(obj)
-        data = { 'id': obj_id }
-        if note:
-            data['annotation'] = self._annotation_key(note)
+        data = {}
+        if obj_id is not None:
+            data['id'] = obj_id
         if sourceport is not None:
             data['sourceport'] = sourceport
         if targetport is not None:
             data['targetport'] = targetport
+        note = self.annotator.notate_object(obj)
+        if note:
+            data['annotation'] = self._annotation_key(note)
         graph.add_edge(source, target, **data)
     
     def _add_object_input_node(self, obj, obj_id, node, port):
@@ -355,7 +384,8 @@ class FlowGraphBuilder(HasTraits):
         context = self._stack[-1]
         graph = context.graph
         input_node = graph.graph['input_node']
-        self._add_object_edge(obj, obj_id, input_node, node, targetport=port)
+        self._add_object_edge(obj, input_node, node, obj_id=obj_id,
+                              targetport=port)
     
     def _get_object_output_node(self, obj_id):
         """ Get the node/port of which the object is an output, if any. 
@@ -385,7 +415,8 @@ class FlowGraphBuilder(HasTraits):
         
         # Set new output.
         output_table[obj_id] = (node, port)
-        self._add_object_edge(obj, obj_id, node, output_node, sourceport=port)
+        self._add_object_edge(obj, node, output_node, obj_id=obj_id,
+                              sourceport=port)
         
         # The object has been created or mutated, so fetch its slots.
         if self.store_slots:
@@ -421,12 +452,12 @@ class FlowGraphBuilder(HasTraits):
                 ])
             }
             graph.add_node(slot_node, **slot_node_data)
-            self._add_object_edge(obj, obj_id, node, slot_node,
+            self._add_object_edge(obj, node, slot_node, obj_id=obj_id,
                                   sourceport=port, targetport='self')
             
             # If object is trackable, recursively set it as output.
-            if ObjectTracker.is_trackable(slot_value):
-                slot_id = event.tracer.track_object(slot_value)
+            slot_id = self.object_tracker.maybe_track(slot_value)
+            if slot_id:
                 self._set_object_output_node(
                     event, slot_value, slot_id, slot_node, '__return__')
     
@@ -460,7 +491,7 @@ class FlowGraphBuilder(HasTraits):
             return data
         
         # Add object ID if available.
-        obj_id = event.tracer.object_tracker.get_id(obj)
+        obj_id = self.object_tracker.get_id(obj)
         if obj_id is not None:
             data['id'] = obj_id
         
@@ -487,30 +518,6 @@ class FlowGraphBuilder(HasTraits):
         """
         keys = ('language', 'package', 'id')
         return '/'.join(note[key] for key in keys)
-    
-    def _hidden_referents(self, tracker, obj):
-        """ Get "hidden" referents of an object.
-        
-        The Python container types `tuple`, `list`, and `dict` are not
-        weak-referenceable and hence not trackable by `ObjectTracker`. In fact,
-        not even subclasses of `tuple` are weak-referenceable! Moreover,
-        `Tracer` does not produce trace events for `tuple`, `list`, `dict`, and
-        `set` literals or comprehensions (because `sys.settrace` does not).
-        Consequently the objects belonging to (referenced by) these containers
-        are "hidden" from our system.
-        
-        This method uses the Python garbage collector to find tracked objects
-        referred to by untrackable containers.
-        
-        See also `Tracker.is_trackable()`.
-        """
-        # FIXME: This whole method is a hack. We should find a better way to
-        # solve this problem.
-        if (isinstance(obj, (tuple, list, dict, set, frozenset)) and
-            not ObjectTracker.is_trackable(obj)):
-            for referent in gc.get_referents(obj):
-                if tracker.is_tracked(referent):
-                    yield referent
     
     def _node_name(self, base):
         """ Get node name unique within flow graph, including nested graphs.
@@ -546,15 +553,23 @@ class _CallContext(HasTraits):
     # Flow graph nested in node, if any.
     graph = Instance(nx.MultiDiGraph, allow_none=True)
     
-    # Output table for the flow graph.
+    # Output table: mapping from object ID to (node, output port) pair.
     #
-    # At any given time during execution, an object is the output of at most one
-    # node, i.e., there is at most one incoming edge to the special output node
-    # that carries a particular object. We maintain this mapping as an auxiliary
-    # data structure called the "output table". It is logically superfluous--the
-    # same information is captured by the graph topology--but it improves
-    # efficiency by allowing constant-time lookup.
+    # At any given time during execution, an object is the output of at most
+    # one node, i.e., there is at most one incoming edge to the special output
+    # node that carries a particular object. We maintain this mapping as an
+    # auxiliary data structure called the "output table". It is logically
+    # superfluous--the same information is captured by the graph topology--but
+    # it improves efficiency by allowing constant-time lookup.
     output_table = Dict()
+
+    # Event table: mapping from trace event to (node, output port) pair.
+    #
+    # As a complement to object tracking, which doesn't always work, we
+    # maintain a correspondence between `TraceValueEvent`s and their outputs.
+    # The dictionary has weak reference keys because we want to allow the trace
+    # events to be garbage collected once they've passed through the system.
+    event_table = Instance(WeakKeyDictionary, ())
 
 
 class _IOSlots(object):
@@ -581,7 +596,7 @@ class _IOSlots(object):
     def __getattr__(self, name):
         event = self.__event
         if name == '__return__':
-            return event.return_value
+            return event.value
         try:
             return event.arguments[name]
         except KeyError:

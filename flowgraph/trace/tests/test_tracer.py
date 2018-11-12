@@ -97,7 +97,7 @@ class TestTracer(unittest.TestCase):
         self.assertEqual(event.function, objects.create_foo)
         self.assertEqual(event.module_name, objects.__name__)
         self.assertEqual(event.qual_name, 'create_foo')
-        self.assertEqual(event.return_value, env['foo'])
+        self.assertEqual(event.value, env['foo'])
     
     def test_atomic_nested_return(self):
         """ Test that the bodies of atomic functions are not traced.
@@ -148,9 +148,9 @@ class TestTracer(unittest.TestCase):
         self.assertEqual(events[2].arguments, OrderedDict([
             ('0',env['container']), ('1','foo_property')
         ]))
-        self.assertEqual(events[3].return_value, env['foo1'])
+        self.assertEqual(events[3].value, env['foo1'])
         self.assertEqual(events[4].qual_name, 'getattr')
-        self.assertEqual(events[5].return_value, env['foo2'])
+        self.assertEqual(events[5].value, env['foo2'])
     
     def test_setattr(self):
         """ Are attribute setters traced?
@@ -170,6 +170,20 @@ class TestTracer(unittest.TestCase):
             ('name' if six.PY3 else '1', 'foo'),
             ('value' if six.PY3 else '2', env['container'].foo),
         ]))
+    
+    def test_boxed_return(self):
+        """ Can the tracer pass boxed values from a function return?
+        """
+        env = self.trace("objects.bar_from_foo(objects.Foo())")
+        
+        events = self.events
+        self.assertEqual(len(events), 4)
+        self.assertEqual(events[2].qual_name, 'bar_from_foo')
+        self.assertIsInstance(events[2].arguments['foo'], objects.Foo)
+
+        event = events[2].argument_events['foo']
+        self.assertIsInstance(event, TraceReturn)
+        self.assertEqual(event.qual_name, 'Foo')
 
 
 if __name__ == '__main__':

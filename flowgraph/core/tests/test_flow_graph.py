@@ -16,6 +16,7 @@ from __future__ import absolute_import
 
 from collections import OrderedDict
 from pathlib2 import Path
+import six
 from textwrap import dedent
 import unittest
 
@@ -28,7 +29,7 @@ from ..flow_graph import new_flow_graph, flatten, join, \
 from ..graphutil import find_node
 from ..graphml import read_graphml_str, write_graphml_str
 from ..record import record_code
-from ...trace.tracer import Tracer
+from ...trace.object_tracker import ObjectTracker
 from . import objects
 
 
@@ -38,27 +39,27 @@ class TestFlowGraph(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        """ Set up the annotation DB and tracer.
+        """ Set up the annotation DB and object tracker.
         """
         objects_path = Path(objects.__file__).parent
         json_path = objects_path.joinpath('data', 'annotations.json')
         cls.db = AnnotationDB()
         cls.db.load_file(str(json_path))
-        cls.tracer = Tracer()
+        cls.object_tracker = ObjectTracker()
 
     def record(self, code, env=None, **kwargs):
         """ Record block of code for test.
         """
         self.env = env if env is not None else {}
         self.env.update(dict(objects=objects))
-        return record_code(dedent(code), db=self.db, tracer=self.tracer,
-                           env=self.env, **kwargs)
+        return record_code(dedent(code), db=self.db, env=self.env, 
+                                  object_tracker=self.object_tracker, **kwargs)
     
     def id(self, name):
         """ Convenience method to get ID for tracked object.
         """
         obj = self.env[name]
-        return self.tracer.object_tracker.get_id(obj)
+        return self.object_tracker.get_id(obj)
     
     def assert_isomorphic(self, g1, g2, check_id=True):
         """ Assert that two flow graphs are isomorphic.
@@ -116,6 +117,18 @@ class TestFlowGraph(unittest.TestCase):
         target.add_node('1', qual_name='bar_from_foo')
         target.add_edge(inputs, '1', id=self.id('foo'), targetport='foo')
         target.add_edge('1', outputs, id=self.id('bar'), sourceport='__return__')
+        self.assert_isomorphic(actual, target)
+    
+    def test_two_object_flow_untrackable_compose(self):
+        """ Check a two-object flow with untrackable objects passed by
+        composition.
+        """
+        actual = self.record("x = sum(range(5))")
+        target = new_flow_graph()
+        target.add_node('range', qual_name='range')
+        target.add_node('sum', qual_name='sum')
+        target.add_edge('range', 'sum', sourceport='__return__',
+                        targetport='iterable' if six.PY3 else '0')
         self.assert_isomorphic(actual, target)
     
     def test_three_object_flow(self):
@@ -363,6 +376,7 @@ class TestFlowGraph(unittest.TestCase):
         target.add_edge('1', outputs, id=self.id('foo'), sourceport='__return__')
         self.assert_isomorphic(actual, target)
     
+    @unittest.skip("Static analysis for sequence literals not implemented")
     def test_track_inside_list(self):
         """ Test a function call with tracked objects inside a list.
         """
@@ -516,15 +530,17 @@ class TestFlowGraph(unittest.TestCase):
                 'annotation': 'python/builtins/int',
                 'value': 2,
             }),
-            ('args', {
-                'argname': 'args',
+            ('0', {
+                'argname': '0',
                 'portkind': 'input',
-                'value': (3,),
+                'annotation': 'python/builtins/int',
+                'value': 3,
             }),
-            ('kw', {
-                'argname': 'kw',
+            ('w', {
+                'argname': 'w',
                 'portkind': 'input',
-                'value': {'w': 4},
+                'annotation': 'python/builtins/int',
+                'value': 4,
             })
         ])
         self.assertEqual(actual, desired)
