@@ -18,6 +18,7 @@ from __future__ import absolute_import
 
 from collections import OrderedDict
 import inspect
+import sys
 import types
 try:
     # Python 3.3+
@@ -25,6 +26,10 @@ try:
 except ImportError:
     # Python 2.7 to 3.2
     from funcsigs import signature
+
+# As of Python 3.6, **kwargs is finally guaranteed to be ordered.
+# https://www.python.org/dev/peps/pep-0468/
+kwargs_ordered = sys.version_info.major >= 3 and sys.version_info.minor >= 6
 
 
 def bind_arguments(fun, *args, **kwargs):
@@ -72,16 +77,19 @@ def bind_arguments_with_signature(sig, *args, **kwargs):
     for param in sig.parameters.values():
         if param.kind == param.VAR_POSITIONAL:
             try:
-                value = arguments.pop(param.name)
+                args = arguments.pop(param.name)
             except KeyError: pass
             else:
-                arguments.update(bind_arguments_without_signature(*value))
+                arguments.update(bind_arguments_without_signature(*args))
         elif param.kind == param.VAR_KEYWORD:
             try:
-                value = arguments.pop(param.name)
+                kwargs = arguments.pop(param.name)
             except KeyError: pass
             else:
-                arguments.update(value)
+                if not kwargs_ordered:
+                    kwargs = OrderedDict((k, kwargs[k])
+                                         for k in sorted(kwargs.keys()))
+                arguments.update(kwargs)
 
     return arguments
 
