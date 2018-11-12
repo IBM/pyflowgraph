@@ -121,7 +121,7 @@ def _ncopies(graph, node, obj_id):
     (The count excludes the special output node.)
     """
     output_node = graph.graph['output_node']
-    return sum(data['id'] == obj_id
+    return sum(data.get('id') == obj_id
                for _, tgt, data in graph.out_edges(node, data=True)
                if tgt != output_node)
 
