@@ -24,6 +24,7 @@ import networkx as nx
 from traitlets import HasTraits, Bool, Dict, Instance, Unicode, default
 
 from flowgraph.kernel.slots import get_slot
+from flowgraph.trace import operator as extra_operator
 from flowgraph.trace.inspect_name import get_class_module_name, \
     get_class_qual_name
 from flowgraph.trace.object_tracker import ObjectTracker
@@ -264,7 +265,8 @@ class FlowGraphBuilder(HasTraits):
         # Add output ports.
         port_names = []
         return_value = event.value
-        if isinstance(return_value, tuple) and event.function is not getattr:
+        if isinstance(return_value, tuple) and \
+                event.function not in (getattr, extra_operator.__tuple__):
             port_names.extend([ '__return__.%i' % i
                                 for i in range(len(return_value)) ])
         elif return_value is not None:

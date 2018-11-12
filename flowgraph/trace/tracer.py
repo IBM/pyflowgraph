@@ -16,7 +16,6 @@ from __future__ import absolute_import
 
 import ast
 from collections import deque, OrderedDict
-import operator
 import six
 import types
 
@@ -24,10 +23,15 @@ from traitlets import HasTraits, Any, Bool, Instance, Int, List
 
 from .ast_tracer import ASTTracer, TraceFunctionCalls
 from .ast_transform import AttributesToFunctions, IndexingToFunctions, \
-    InplaceOperatorsToFunctions, OperatorsToFunctions
+    InplaceOperatorsToFunctions, OperatorsToFunctions, \
+    ContainerLiteralsToFunction
 from .inspect_function import bind_arguments
 from .inspect_name import get_func_module_name, get_func_qual_name
 from .trace_event import TraceEvent, TraceValueEvent, TraceCall, TraceReturn
+
+# Modules needed for tracer execution environment.
+import operator
+from . import operator as extra_operator
 
 
 class Tracer(ASTTracer):
@@ -171,6 +175,7 @@ class Tracer(ASTTracer):
         env = dict(globals())
         env.update(dict(
             __operator__ = operator,
+            __extra_operator__ = extra_operator,
             __trace__ = self,
         ))
         return env
@@ -184,6 +189,7 @@ class Tracer(ASTTracer):
             IndexingToFunctions(operator_name),
             OperatorsToFunctions(operator_name),
             InplaceOperatorsToFunctions(operator_name),
+            ContainerLiteralsToFunction('__extra_operator__'),
             TraceFunctionCalls('__trace__'),
         ]
         for transformer in transformers:

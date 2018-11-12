@@ -26,6 +26,8 @@ except ImportError:
     # Python 2.7 to 3.2
     from funcsigs import signature
 
+from . import operator as extra_operator
+
 
 def bind_arguments(fun, *args, **kwargs):
     """ Bind arguments to function or method.
@@ -34,6 +36,11 @@ def bind_arguments(fun, *args, **kwargs):
     `inspect.signature`, the `self` parameter of bound instance methods is
     included as an argument.
     """
+    if getattr(fun, '__module__', None) == extra_operator.__name__:
+        # Case 0: Treat certain special functions as builtins, in particular
+        # ignoring *args and **kwargs.
+        return fake_bind_arguments(*args, **kwargs)
+
     if inspect.ismethod(fun) and not inspect.isclass(fun.__self__):
         # Case 1: Bound instance method, implemented in Python.
         # Reduce to Case 2 below because `Signature.bind()`` excludes `self`
@@ -60,9 +67,16 @@ def bind_arguments(fun, *args, **kwargs):
         args = (fun_self,) + args
 
     # Case 4: Callable implemented in C ("builtin")
+    return fake_bind_arguments(*args, **kwargs)
+
+
+def fake_bind_arguments(*args, **kwargs):
+    """ Bind function arguments without any function or signature object.
+
+    Useful for builtin functions, whose signatures simply cannot be inspected.
+    """
     arguments = OrderedDict()
     for i, value in enumerate(args):
         arguments[str(i)] = value
-    for key, value in kwargs.items():
-        arguments[key] = value
+    arguments.update(kwargs)
     return arguments

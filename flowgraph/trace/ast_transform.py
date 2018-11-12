@@ -246,6 +246,43 @@ class OperatorsToFunctions(ast.NodeTransformer):
             return to_call(self.op_to_function(op), [node.left, comparator])
 
 
+class ContainerLiteralsToFunction(ast.NodeTransformer):
+    """ Replace container literals with function calls.
+    """
+
+    def __init__(self, operator_module=None):
+        super(ContainerLiteralsToFunction, self).__init__()
+        self.operator = to_name(operator_module or 'operator')
+    
+    def visit_List(self, node):
+        """ Convert list literal to function call.
+        """
+        if isinstance(node.ctx, ast.Load):
+            return to_call(to_attribute(self.operator, '__list__'), node.elts)
+        return node
+    
+    def visit_Tuple(self, node):
+        """ Convert tuple literal to function call.
+        """
+        if isinstance(node.ctx, ast.Load):
+            return to_call(to_attribute(self.operator, '__tuple__'), node.elts)
+        return node
+    
+    def visit_Set(self, node):
+        """ Convert set literal to function call.
+        """
+        return to_call(to_attribute(self.operator, '__set__'), node.elts)
+    
+    def visit_Dict(self, node):
+        """ Convert dictionary literal to function call, if possible.
+        """
+        if all(isinstance(key, ast.Str) for key in node.keys):
+            keywords = [ ast.keyword(arg=key.s, value=value)
+                         for key, value in zip(node.keys, node.values) ]
+            return to_call(to_name('dict'), keywords=keywords)
+        return node
+
+
 # Helper functions
 
 def to_call(func, args=[], keywords=[], starargs=None, kwargs=None):

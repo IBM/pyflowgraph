@@ -114,7 +114,28 @@ class IntegrationTestFlowGraph(unittest.TestCase):
         target.add_edge('arange', 'reshape', sourceport='__return__', targetport='0',
                         annotation='python/numpy/ndarray')
         target.add_edge('shape', 'reshape', sourceport='__return__', targetport='1')
-        mapping = self.assert_isomorphic(graph, target)
+        self.assert_isomorphic(graph, target)
+    
+    def test_numpy_slice(self):
+        """ Extended slice of NumPy array.
+        """
+        graph = self.record_script("numpy_slice_array")
+        graph.remove_node(graph.graph['output_node'])
+        
+        target = new_flow_graph()
+        target.remove_node(target.graph['output_node'])
+        target.add_node('rand', qual_name='RandomState.rand')
+        target.add_node('slice', qual_name='slice')
+        target.add_node('extslice', qual_name='__tuple__')
+        target.add_node('getitem', qual_name='getitem')
+        target.add_node('gt', qual_name='gt')
+        target.add_edge('rand', 'getitem', sourceport='__return__', targetport='0',
+                        annotation='python/numpy/ndarray')
+        target.add_edge('slice', 'extslice', sourceport='__return__', targetport='0')
+        target.add_edge('extslice', 'getitem', sourceport='__return__', targetport='1')
+        target.add_edge('getitem', 'gt', sourceport='__return__', targetport='0',
+                        annotation='python/numpy/ndarray')
+        self.assert_isomorphic(graph, target)
     
     def test_pandas_read_sql(self):
         """ Read SQL table using pandas and SQLAlchemy.
