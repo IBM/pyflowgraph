@@ -71,6 +71,10 @@ class Empty(object):
     pass
 
 
+# A global Foo instance.
+FOO = Foo()
+
+
 def create_foo():
     return Foo()
 

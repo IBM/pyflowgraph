@@ -331,7 +331,7 @@ class TestFlowGraph(unittest.TestCase):
         self.assert_isomorphic(actual, target)
     
     def test_attributes_methods(self):
-        """ Test that attribute accesses and method calls are traced.
+        """ Test that attribute accesses and method calls are recorded.
         """
         actual = self.record("""
             foo = objects.Foo()
@@ -375,6 +375,23 @@ class TestFlowGraph(unittest.TestCase):
                         sourceport='__return__', targetport='self')
         target.add_edge('1', outputs, id=self.id('foo'), sourceport='__return__')
         self.assert_isomorphic(actual, target)
+    
+    def test_module_instance(self):
+        """ Test that module-level global instances are recorded.
+        """
+        actual = self.record("foo = objects.FOO")
+        
+        target = new_flow_graph()
+        outputs = target.graph['output_node']
+        target.add_node('getattr', qual_name='getattr', slot='FOO')
+        target.add_edge('getattr', outputs, id=self.id('foo'), 
+                        sourceport='__return__')
+        self.assert_isomorphic(actual, target)
+
+        node = find_node(actual, lambda n: n.get('qual_name') == 'getattr')
+        port_data = actual.node[node]['ports']['0']
+        self.assertEqual(port_data['qual_name'], 'module')
+        self.assertEqual(port_data['value'], objects.__name__)
     
     @unittest.skip("Static analysis for sequence literals not implemented")
     def test_track_inside_list(self):

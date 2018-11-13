@@ -17,10 +17,11 @@ from __future__ import absolute_import
 from collections import OrderedDict
 import six
 from textwrap import dedent
+import types
 import unittest
 
 from flowgraph.core.tests import objects
-from ..trace_event import TraceCall, TraceReturn
+from ..trace_event import TraceFunctionEvent, TraceCall, TraceReturn
 from ..tracer import Tracer
 
 
@@ -35,9 +36,19 @@ class TestTracer(unittest.TestCase):
         self.events = []
         def handler(changed):
             event = changed['new']
-            if event:
+            if event and self.filter_trace_event(event):
                 self.events.append(event)
         self.tracer.observe(handler, 'event')
+    
+    def filter_trace_event(self, event):
+        """ Whether to keep trace event.
+        """
+        if isinstance(event, TraceFunctionEvent) and event.function is getattr:
+            # Ignore attribute access on modules.
+            first_arg = next(iter(event.arguments.values()))
+            return not isinstance(first_arg, types.ModuleType)
+
+        return True
     
     def trace(self, code):
         """ Trace code in environment with test objects.

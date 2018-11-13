@@ -150,8 +150,7 @@ class Tracer(ASTTracer):
         # Create call event.
         event = self._create_call_event(function, arguments)
         emit_events = prev_scope.emit_events and \
-            not (prev_scope.event and prev_scope.event.atomic) and \
-            self._filter_call(function, arguments)
+            not (prev_scope.event and prev_scope.event.atomic)
         if emit_events:
             self.event = event
 
@@ -224,16 +223,6 @@ class Tracer(ASTTracer):
                            atomic=call.atomic, module_name=call.module_name,
                            qual_name=call.qual_name, value=return_value,
                            arguments=call.arguments)
-    
-    def _filter_call(self, func, arguments):
-        """ Whether to emit trace events for function call (and return).
-        """
-        if func is getattr:
-            # Ignore attribute access on modules.
-            first_arg = next(iter(arguments.values()))
-            return not isinstance(first_arg, types.ModuleType)
-
-        return True
 
 
 class _ScopeItem(HasTraits):

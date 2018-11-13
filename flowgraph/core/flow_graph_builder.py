@@ -32,6 +32,11 @@ from flowgraph.trace.trace_event import TraceEvent, TraceCall, TraceReturn
 from .annotator import Annotator
 from .flow_graph import new_flow_graph
 
+# Don't record `getattr` when the attribute has one of these types.
+ignore_attr_types = (type, types.ModuleType,
+                     types.FunctionType, types.MethodType,
+                     types.BuiltinFunctionType, types.BuiltinMethodType)
+
 
 class FlowGraphBuilder(HasTraits):
     """ Build an object flow graph from a stream of trace events.
@@ -196,12 +201,11 @@ class FlowGraphBuilder(HasTraits):
         context = self._stack[-1]
         graph = context.graph
 
-        # Special case: If attribute is a bound method, remove the call node.
-        # Method objects are not tracked and the method will be traced when it
-        # is called, so the `getattr` node is redundant.
+        # Special case: If an attribute is a function or a module, remove the
+        # call node and exit. Functions and modules are not explicitly recorded
+        # (though of course function *calls* are!).
         return_value = event.value
-        method_types = (types.MethodType, types.BuiltinMethodType)
-        if event.function is getattr and isinstance(return_value, method_types):
+        if event.function is getattr and isinstance(return_value, ignore_attr_types):
             graph.remove_node(node)
             return
         
@@ -498,11 +502,13 @@ class FlowGraphBuilder(HasTraits):
         # Add value if the object is primitive.
         if self.is_primitive(obj):
             data['value'] = deepcopy(obj)
-        
-        # Add type information if type is not built-in.
+        elif isinstance(obj, types.ModuleType):
+            data['value'] = obj.__name__
+
+        # Add type information if type is not builtin.
         obj_type = obj.__class__
         module_name = get_class_module_name(obj_type)
-        if not module_name == 'builtins':
+        if module_name != 'builtins' or isinstance(obj, types.ModuleType):
             data['module'] = module_name
             data['qual_name'] = get_class_qual_name(obj_type)
 
