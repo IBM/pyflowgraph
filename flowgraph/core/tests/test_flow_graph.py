@@ -393,6 +393,26 @@ class TestFlowGraph(unittest.TestCase):
         self.assertEqual(port_data['qual_name'], 'module')
         self.assertEqual(port_data['value'], objects.__name__)
     
+    def test_primitive_values(self):
+        """ Test that primitive values passed by variables are recorded.
+        """
+        actual = self.record("""
+            foo = objects.Foo()
+            x = foo.do_sum()
+            new_foo = objects.Foo(x)
+        """)
+
+        target = new_flow_graph()
+        outputs = target.graph['output_node']
+        target.add_node('foo', qual_name='Foo')
+        target.add_node('sum', qual_name='Foo.do_sum')
+        target.add_node('new_foo', qual_name='Foo')
+        target.add_edge('foo', outputs, sourceport='__return__')
+        target.add_edge('foo', 'sum', sourceport='__return__', targetport='self')
+        target.add_edge('sum', 'new_foo', sourceport='__return__', targetport='x')
+        target.add_edge('new_foo', outputs, sourceport='__return__')
+        self.assert_isomorphic(actual, target, check_id=False)
+    
     @unittest.skip("Static analysis for sequence literals not implemented")
     def test_track_inside_list(self):
         """ Test a function call with tracked objects inside a list.

@@ -28,7 +28,8 @@ from flowgraph.trace import operator as extra_operator
 from flowgraph.trace.inspect_name import get_class_module_name, \
     get_class_qual_name
 from flowgraph.trace.object_tracker import ObjectTracker
-from flowgraph.trace.trace_event import TraceEvent, TraceCall, TraceReturn
+from flowgraph.trace.trace_event import TraceEvent, TraceCall, TraceReturn, \
+    TraceAccess, TraceAssign
 from .annotator import Annotator
 from .flow_graph import new_flow_graph
 
@@ -81,6 +82,10 @@ class FlowGraphBuilder(HasTraits):
             self._push_call_event(event)
         elif isinstance(event, TraceReturn):
             self._push_return_event(event)
+        elif isinstance(event, TraceAccess):
+            self._push_access_event(event)
+        elif isinstance(event, TraceAssign):
+            self._push_assign_event(event)
     
     def reset(self):
         """ Reset the flow graph builder.
@@ -235,6 +240,30 @@ class FlowGraphBuilder(HasTraits):
         
         # Update node and port data for this call.
         self._update_call_node_for_return(event, annotation, node)
+    
+    def _push_access_event(self, event):
+        """ Update event table for variable access event.
+        """
+        context = self._stack[-1]
+        source = context.variable_table.get(event.name)
+        if source is not None:
+            context.event_table[event] = source
+    
+    def _push_assign_event(self, event):
+        """ Update variable table for variable assign event.
+        """
+        context = self._stack[-1]
+        obj = event.value
+        obj_id = self.object_tracker.get_id(obj)
+        source = None
+        if obj_id:
+            source = context.output_table[obj_id]
+        elif event.value_event:
+            source = context.event_table.get(event.value_event)
+        
+        if source is not None:
+            for name in event.names:
+                context.variable_table[name] = source
         
     def _add_call_node(self, event, annotation):
         """ Add a new call node for a call event.
@@ -567,12 +596,18 @@ class _CallContext(HasTraits):
     # it improves efficiency by allowing constant-time lookup.
     output_table = Dict()
 
+    # Variable table: mapping from variable names to (node, output port) pair.
+    #
+    # A complement to object tracking, which doesn't work for objects that
+    # are not weak referenceable.
+    variable_table = Dict()
+
     # Event table: mapping from trace event to (node, output port) pair.
     #
-    # As a complement to object tracking, which doesn't always work, we
-    # maintain a correspondence between `TraceValueEvent`s and their outputs.
-    # The dictionary has weak reference keys because we want to allow the trace
-    # events to be garbage collected once they've passed through the system.
+    # Like the variable table, the event table is only relevant for objects
+    # that can't be tracked. The dictionary has weak reference keys because we
+    # want to allow the trace events to be garbage collected once they've
+    # passed through the system.
     event_table = Instance(WeakKeyDictionary, ())
 
 
