@@ -253,7 +253,7 @@ class LoggingASTTracer(ASTTracer):
         )
         return arg_value
     
-    def _trace_return(self, return_value):
+    def _trace_return(self, return_value, nvalues=1):
         self.call_history.append(('return', return_value))
         return return_value
     

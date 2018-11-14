@@ -44,10 +44,10 @@ class ASTTracer(HasTraits):
         """
         return self._unbox(self._trace_argument(arg_value, arg_name, nstars))
 
-    def trace_return(self, return_value):
+    def trace_return(self, return_value, nvalues=1):
         """ Called after function returns.
         """
-        return self._unbox(self._trace_return(return_value))
+        return self._unbox(self._trace_return(return_value, nvalues))
     
     def trace_access(self, name, value):
         """ Called after a variable is accessed.
@@ -78,7 +78,7 @@ class ASTTracer(HasTraits):
         """
         return arg_value
     
-    def _trace_return(self, return_value):
+    def _trace_return(self, return_value, nvalues=1):
         """ Called after function returns.
 
         May be reimplemented in subclasss.
@@ -118,7 +118,7 @@ class ASTTraceTransformer(ast.NodeTransformer):
     def __init__(self, tracer):
         super(ASTTraceTransformer, self).__init__()
         self.tracer = to_name(tracer)
-        self._allow_boxed = False
+        self._state = {} # Hack to pass state to immediate child node.
     
     def tracer_method(self, method, private=False):
         """ Make AST node for a method on the tracer.
@@ -127,17 +127,18 @@ class ASTTraceTransformer(ast.NodeTransformer):
             method = '_' + method
         return to_attribute(self.tracer, method)
     
-    def generic_visit(self, node):
-        """ Reimplemented to disable boxing on generic visits.
+    def visit(self, node):
+        """ Reimplemented to clear state on visit.
         """
-        self._allow_boxed = False
-        return super(ASTTraceTransformer, self).generic_visit(node)
+        self._state.clear()
+        return super(ASTTraceTransformer, self).visit(node)
     
-    def visit_boxed(self, node):
-        """ Visit node, enabling boxed values immediately but not recursively.
+    def visit_with_state(self, node, **kwargs):
+        """ Visit node, after setting state for this (non-generic) visit only.
         """
-        self._allow_boxed = True
-        return self.visit(node)
+        self._state.clear()
+        self._state.update(kwargs)
+        return super(ASTTraceTransformer, self).visit(node)
     
     def visit_Call(self, call):
         """ Rewrite AST Call node with tracing.
@@ -161,8 +162,8 @@ class ASTTraceTransformer(ast.NodeTransformer):
 
             ...(x=trace_argument(_trace_return(...), 'x'))
         """
-        allowed_boxed = self._allow_boxed
-        self._allow_boxed = False
+        boxed = self._state.get('boxed', False)
+        nvalues = self._state.get('nvalues', 1)
         func = self.visit(call.func)
 
         # Visit positional and keyword arguments.
@@ -183,13 +184,14 @@ class ASTTraceTransformer(ast.NodeTransformer):
                 nargs += 1
 
         return to_call(
-            self.tracer_method('trace_return', private=allowed_boxed), [
+            self.tracer_method('trace_return', private=boxed), [
             to_call(
                 to_call(self.tracer_method('trace_function'), [
                     func, ast.Num(nargs)
                 ]),
                 args, keywords, starargs, kwargs
-            )
+            ),
+            ast.Num(nvalues),
         ])
     
     def visit_argument(self, arg_value, arg_name=None, nstars=0):
@@ -202,7 +204,7 @@ class ASTTraceTransformer(ast.NodeTransformer):
             nstars = 1
         
         # Create new call.
-        args = [ self.visit_boxed(arg_value) ]
+        args = [ self.visit_with_state(arg_value, boxed=True) ]
         if arg_name:
             args += [ ast.Str(arg_name) ]
         keywords = []
@@ -223,7 +225,7 @@ class ASTTraceTransformer(ast.NodeTransformer):
             trace_access('x', x)
         """
         if isinstance(name.ctx, ast.Load):
-            boxed = self._allow_boxed
+            boxed = self._state.get('boxed', False)
             return to_call(self.tracer_method('trace_access', private=boxed), [
                 ast.Str(name.id),
                 name,
@@ -241,10 +243,16 @@ class ASTTraceTransformer(ast.NodeTransformer):
 
             x = y = trace_assign(['x','y'], 1)
         """
-        value = self.visit_boxed(node.value)
+        targets_literal = to_list(map(self.target_to_literal, node.targets))
+
+        # Determine number of values in a compound assignment like `x,y = ...`.
+        # FIXME: What about a case like `z = x,y = ...`? We're taking the max.
+        targets = ast.literal_eval(targets_literal)
+        nvalues = max(1 if isinstance(t, str) else len(t) for t in targets)
+
         node.value = to_call(self.tracer_method('trace_assign'), [
-            to_list(map(self.target_to_literal, node.targets)),
-            value,
+            targets_literal,
+            self.visit_with_state(node.value, boxed=True, nvalues=nvalues),
         ])
         return node
     

@@ -96,6 +96,29 @@ class IntegrationTestFlowGraph(unittest.TestCase):
         
         return graph
     
+    def test_numpy_meshgrid(self):
+        """ Create two-dimensional grid using NumPy's `meshgrid`.
+        """
+        graph = self.record_script("numpy_meshgrid")
+        target = new_flow_graph()
+        outputs = target.graph['output_node']
+        target.add_node('lin1', qual_name='linspace')
+        target.add_node('lin2', qual_name='linspace')
+        target.add_node('meshgrid', qual_name='meshgrid')
+        target.add_edge('lin1', 'meshgrid', sourceport='__return__', targetport='0',
+                        annotation='python/numpy/ndarray')
+        target.add_edge('lin2', 'meshgrid', sourceport='__return__', targetport='1',
+                        annotation='python/numpy/ndarray')
+        target.add_edge('lin1', outputs, sourceport='__return__',
+                        annotation='python/numpy/ndarray')
+        target.add_edge('lin2', outputs, sourceport='__return__',
+                        annotation='python/numpy/ndarray')
+        target.add_edge('meshgrid', outputs, sourceport='__return__.0',
+                        annotation='python/numpy/ndarray')
+        target.add_edge('meshgrid', outputs, sourceport='__return__.1',
+                        annotation='python/numpy/ndarray')
+        self.assert_isomorphic(graph, target)
+    
     def test_numpy_reshape(self):
         """ Reshape a NumPy array.
         """

@@ -158,11 +158,11 @@ class Tracer(ASTTracer):
         scope = _ScopeItem(event=event, emit_events=emit_events)
         self._stack.append(scope)
     
-    def _trace_return(self, return_value):
+    def _trace_return(self, return_value, nvalues):
         """ Called after function returns.
         """
         scope = self._stack.pop()
-        event = self._create_return_event(scope.event, return_value)
+        event = self._create_return_event(scope.event, return_value, nvalues)
         if scope.emit_events:
             self.event = event
         return event
@@ -254,14 +254,14 @@ class Tracer(ASTTracer):
                          module_name=module_name, qual_name=qual_name,
                          arguments=arguments, argument_events=argument_events)
     
-    def _create_return_event(self, call_event, return_value):
+    def _create_return_event(self, call_event, return_value, nvalues):
         """ Create trace event for function return.
         """
         call = call_event
         return TraceReturn(tracer=self, function=call.function,
                            atomic=call.atomic, module_name=call.module_name,
-                           qual_name=call.qual_name, value=return_value,
-                           arguments=call.arguments)
+                           qual_name=call.qual_name, arguments=call.arguments, 
+                           value=return_value, nvalues=nvalues)
 
 
 class _ScopeItem(HasTraits):

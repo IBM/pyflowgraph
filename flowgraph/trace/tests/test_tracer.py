@@ -244,6 +244,20 @@ class TestTracer(unittest.TestCase):
         self.assertEqual(event.value, env['foo'])
         self.assertIsInstance(event.value_event, TraceReturn)
         self.assertEqual(event.value_event.function, objects.Foo)
+        self.assertEqual(event.value_event.nvalues, 1)
+
+    def test_variable_compound_assign_boxed_return(self):
+        """ Can the tracer pass boxed return values to a compound assignment?
+        """
+        env = self.trace('foo, bar = objects.create_foo_and_bar()')
+
+        events = self.variable_events
+        event = next(evt for evt in events if isinstance(evt, TraceAssign))
+        self.assertEqual(event.names, [('foo','bar')])
+        self.assertEqual(event.value, (env['foo'],env['bar']))
+        self.assertIsInstance(event.value_event, TraceReturn)
+        self.assertEqual(event.value_event.function, objects.create_foo_and_bar)
+        self.assertEqual(event.value_event.nvalues, 2)
     
     def test_variable_assign_boxed_access(self):
         """ Can the tracer pass boxed variable values to variable assignments?

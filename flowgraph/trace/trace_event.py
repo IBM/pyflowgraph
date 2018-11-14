@@ -16,7 +16,7 @@ from __future__ import absolute_import
 
 from collections import OrderedDict
 
-from traitlets import HasTraits, Any, Bool, Dict, Instance, List, Unicode
+from traitlets import HasTraits, Any, Bool, Dict, Instance, Int, List, Unicode
 
 from .ast_tracer import BoxedValue
 
@@ -72,7 +72,8 @@ class TraceCall(TraceFunctionEvent):
     """
     
     # Mapping from argument name to argument value.
-    # The ordering of the arguments is that of the function definition.
+    #
+    # The arguments are ordered according to the function definition.
     arguments = Instance(OrderedDict)
 
     # Mapping from argument name to argument's parent event, if any.
@@ -86,10 +87,22 @@ class TraceReturn(TraceFunctionEvent, TraceValueEvent):
     """
     
     # Map from argument name to argument value.
+    #
     # Warning: if an argument has pass-by-reference semantics (as most types
     # in Python do), the argument may be mutated from its state in the 
     # corresponding call event.
     arguments = Instance(OrderedDict)
+
+    # Number of return values, as estimated only by syntax.
+    #
+    # In an ordinary assignment, `x = f()`, or function composition, `g(f())`,
+    # this number will be 1, but in a compound assignment, `x, y = f()`, it will
+    # be greater than 1.
+    #
+    # Note: Python supports multiple return values only implicitly, by returning
+    # tuples or other sequences. Any attempt to determine the "true"  or
+    # "logical" number of return values must ultimately be a heuristic.
+    nvalues = Int(1)
 
 
 class TraceAccess(TraceValueEvent):

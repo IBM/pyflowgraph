@@ -78,16 +78,11 @@ class FlowGraphBuilder(HasTraits):
     def push_event(self, event):
         """ Push a new trace event to the builder.
         """
-        if isinstance(event, TraceCall):
-            self._push_call_event(event)
-        elif isinstance(event, TraceReturn):
-            self._push_return_event(event)
-        elif isinstance(event, TraceAccess):
-            self._push_access_event(event)
-        elif isinstance(event, TraceAssign):
-            self._push_assign_event(event)
-        elif isinstance(event, TraceDelete):
-            self._push_delete_event(event)
+        if isinstance(event, TraceCall): self._push_call_event(event)
+        elif isinstance(event, TraceReturn): self._push_return_event(event)
+        elif isinstance(event, TraceAccess): self._push_access_event(event)
+        elif isinstance(event, TraceAssign): self._push_assign_event(event)
+        elif isinstance(event, TraceDelete): self._push_delete_event(event)
     
     def reset(self):
         """ Reset the flow graph builder.
@@ -162,8 +157,9 @@ class FlowGraphBuilder(HasTraits):
         returning a tuple. We treat tuples as multiple returns, subject to a
         few special exceptions.
         """
-        return isinstance(event.value, tuple) and \
-            event.function not in (getattr, extra_operator.__tuple__)
+        return (event.nvalues > 1 or 
+                (isinstance(event.value, tuple) and 
+                 event.function not in (getattr, extra_operator.__tuple__)))
     
     # Protected interface
             
