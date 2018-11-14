@@ -16,7 +16,7 @@ from __future__ import absolute_import
 
 from collections import OrderedDict
 
-from traitlets import HasTraits, Any, Bool, Dict, Instance, Unicode
+from traitlets import HasTraits, Any, Bool, Dict, Instance, List, Unicode
 
 from .ast_tracer import BoxedValue
 
@@ -90,6 +90,29 @@ class TraceReturn(TraceFunctionEvent, TraceValueEvent):
     # in Python do), the argument may be mutated from its state in the 
     # corresponding call event.
     arguments = Instance(OrderedDict)
+
+
+class TraceAccess(TraceValueEvent):
+    """ Event generated immediately after a variable is accessed.
+
+    The variable's value is stored in the `value` attribute.
+    """
+
+    # Name of variable that was accessed.
+    name = Unicode()
+
+
+class TraceAssign(TraceValueEvent):
+    """ Event generated immediately before a variable is assigned.
+
+    The value to be assigned is stored in the `value` attribute.
+    """
+
+    # Names of variables to be assigned.
+    names = List()
+
+    # Parent event of value, if any.
+    value_event = Instance(TraceValueEvent, allow_none=True)
 
 
 # XXX: Trait change notifications for `return_value` can lead to FutureWarning

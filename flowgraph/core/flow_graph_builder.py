@@ -75,14 +75,12 @@ class FlowGraphBuilder(HasTraits):
         return nx.MultiDiGraph(self._stack[0].graph)
     
     def push_event(self, event):
-        """ Push a new TraceEvent to the builder.
+        """ Push a new trace event to the builder.
         """
         if isinstance(event, TraceCall):
             self._push_call_event(event)
         elif isinstance(event, TraceReturn):
             self._push_return_event(event)
-        else:
-            raise TypeError("Event must be TraceCall or TraceReturn")
     
     def reset(self):
         """ Reset the flow graph builder.

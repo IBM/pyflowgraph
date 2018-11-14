@@ -27,7 +27,8 @@ from .ast_transform import AttributesToFunctions, IndexingToFunctions, \
     ContainerLiteralsToFunctions
 from .inspect_function import bind_arguments
 from .inspect_name import get_func_module_name, get_func_qual_name
-from .trace_event import TraceEvent, TraceValueEvent, TraceCall, TraceReturn
+from .trace_event import TraceEvent, TraceValueEvent, TraceCall, TraceReturn, \
+    TraceAccess, TraceAssign
 
 # Modules needed for tracer execution environment.
 import operator
@@ -165,6 +166,37 @@ class Tracer(ASTTracer):
         if scope.emit_events:
             self.event = event
         return event
+    
+    def _trace_access(self, name, value):
+        """ Called after a variable is accessed.
+        """
+        scope = self._stack[-1]
+
+        # Create access event.
+        if scope.emit_events:
+            self.event = event = TraceAccess(name=name, value=value)
+            return event
+        
+        return value
+    
+    def _trace_assign(self, names, value):
+        """ Called immediately before a variable is assigned.
+        """
+        scope = self._stack[-1]
+
+        if isinstance(value, TraceValueEvent):
+            value_event = value
+            value = value_event.value
+        else:
+            value_event = None
+
+        # Create assign event.
+        if scope.emit_events:
+            self.event = event = TraceAssign(
+                names=names, value=value, value_event=value_event)
+            return event
+        
+        return value
     
     # Protected interface
 

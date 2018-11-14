@@ -212,10 +212,11 @@ class ASTTraceTransformer(ast.NodeTransformer):
             trace_access('x', x)
         """
         if isinstance(name.ctx, ast.Load):
-            return to_call(
-                self.tracer_method('trace_access', private=self._allow_boxed),
-                [ ast.Str(name.id), name ],
-            )
+            boxed = self._allow_boxed
+            return to_call(self.tracer_method('trace_access', private=boxed), [
+                ast.Str(name.id),
+                name,
+            ])
         return name
     
     def visit_Assign(self, node):
@@ -229,12 +230,11 @@ class ASTTraceTransformer(ast.NodeTransformer):
 
             x = y = trace_assign(['x','y'], 1)
         """
-        allowed_boxed = self._allow_boxed
-        self.generic_visit(node)
-        node.value = to_call(
-            self.tracer_method('trace_assign', private=allowed_boxed),
-            [ to_list(map(self.target_to_literal, node.targets)), node.value ],
-        )
+        value = self.visit_boxed(node.value)
+        node.value = to_call(self.tracer_method('trace_assign'), [
+            to_list(map(self.target_to_literal, node.targets)),
+            value,
+        ])
         return node
     
     def target_to_literal(self, node):
