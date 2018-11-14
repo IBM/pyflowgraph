@@ -210,7 +210,7 @@ class TestASTTransform(unittest.TestCase):
         """ Can we replace a list literal with a function call?
         """
         node = ast.parse('[1,2,3]')
-        ContainerLiteralsToFunction().visit(node)
+        ContainerLiteralsToFunctions().visit(node)
         result = 'operator.__list__(1, 2, 3)'
         self.assertEqual(to_source(node).strip(), result)
     
@@ -218,7 +218,7 @@ class TestASTTransform(unittest.TestCase):
         """ Can we replace a tuple literal with a function call?
         """
         node = ast.parse('(1,2,3)')
-        ContainerLiteralsToFunction().visit(node)
+        ContainerLiteralsToFunctions().visit(node)
         result = 'operator.__tuple__(1, 2, 3)'
         self.assertEqual(to_source(node).strip(), result)
     
@@ -226,7 +226,7 @@ class TestASTTransform(unittest.TestCase):
         """ Can we replace a set literal with a function call?
         """
         node = ast.parse('{1,2,3}')
-        ContainerLiteralsToFunction().visit(node)
+        ContainerLiteralsToFunctions().visit(node)
         result = 'operator.__set__(1, 2, 3)'
         self.assertEqual(to_source(node).strip(), result)
     
@@ -235,7 +235,7 @@ class TestASTTransform(unittest.TestCase):
         function call?
         """
         node = ast.parse("{'x': 1, 'y': 2}")
-        ContainerLiteralsToFunction().visit(node)
+        ContainerLiteralsToFunctions().visit(node)
         result = 'dict(x=1, y=2)'
         self.assertEqual(to_source(node).strip(), result)
 

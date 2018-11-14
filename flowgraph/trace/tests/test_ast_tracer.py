@@ -21,7 +21,7 @@ import unittest
 
 from traitlets import List
 
-from ..ast_tracer import ASTTracer, TraceFunctionCalls
+from ..ast_tracer import ASTTracer, ASTTraceTransformer
 
 # Imports for test code only.
 from fractions import Fraction
@@ -34,8 +34,9 @@ class TestASTTracer(unittest.TestCase):
     def setUp(self):
         """ Reset trace state for test.
         """
-        self.history = []
-        self.tracer = LoggingASTTracer(log=self.history)
+        self.tracer = LoggingASTTracer()
+        self.call_history = self.tracer.call_history
+        self.var_history = self.tracer.var_history
 
     def exec_ast(self, node, env=None):
         """ Execute AST node in environment.
@@ -58,13 +59,13 @@ class TestASTTracer(unittest.TestCase):
         x = Fraction(3,7)
         y = x.limit_denominator(2)
         """))
-        TraceFunctionCalls('__trace__').visit(node)
+        ASTTraceTransformer('__trace__').visit(node)
 
         self.exec_ast(node)
         x, y = self.env['x'], self.env['y']
         self.assertEqual(x, Fraction(3,7))
         self.assertEqual(y, Fraction(1,2))
-        self.assertEqual(self.history, [
+        self.assertEqual(self.call_history, [
             ('function', Fraction, 2),
             ('arg', 3),
             ('arg', 7),
@@ -78,11 +79,11 @@ class TestASTTracer(unittest.TestCase):
         """ Can we trace calls of builtin functions?
         """
         node = ast.parse('x = sum(range(5))')
-        TraceFunctionCalls('__trace__').visit(node)
+        ASTTraceTransformer('__trace__').visit(node)
         
         self.exec_ast(node)
         self.assertEqual(self.env['x'], sum(range(5)))
-        self.assertEqual(self.history, [
+        self.assertEqual(self.call_history, [
             ('function', sum, 1),
             ('function', range, 1),
             ('arg', 5),
@@ -98,10 +99,10 @@ class TestASTTracer(unittest.TestCase):
         from fractions import Fraction
         Fraction(numerator=3, denominator=7)
         """))
-        TraceFunctionCalls('__trace__').visit(node)
+        ASTTraceTransformer('__trace__').visit(node)
 
         self.exec_ast(node)
-        self.assertEqual(self.history, [
+        self.assertEqual(self.call_history, [
             ('function', Fraction, 2),
             ('arg', ('numerator', 3)),
             ('arg', ('denominator', 7)),
@@ -116,10 +117,10 @@ class TestASTTracer(unittest.TestCase):
         args = [3, 7]
         Fraction(*args)
         """))
-        TraceFunctionCalls('__trace__').visit(node)
+        ASTTraceTransformer('__trace__').visit(node)
 
         self.exec_ast(node)
-        self.assertEqual(self.history, [
+        self.assertEqual(self.call_history, [
             ('function', Fraction, 1),
             ('*arg', [3, 7]),
             ('return', Fraction(3,7)),
@@ -133,10 +134,10 @@ class TestASTTracer(unittest.TestCase):
         kwargs = { 'numerator': 3, 'denominator': 7}
         Fraction(**kwargs)
         """))
-        TraceFunctionCalls('__trace__').visit(node)
+        ASTTraceTransformer('__trace__').visit(node)
 
         self.exec_ast(node)
-        self.assertEqual(self.history, [
+        self.assertEqual(self.call_history, [
             ('function', Fraction, 1),
             ('**arg', { 'numerator': 3, 'denominator': 7 }),
             ('return', Fraction(3,7)),
@@ -151,35 +152,93 @@ class TestASTTracer(unittest.TestCase):
         kwargs = { 'denominator': 7}
         Fraction(*args, **kwargs)
         """))
-        TraceFunctionCalls('__trace__').visit(node)
+        ASTTraceTransformer('__trace__').visit(node)
 
         self.exec_ast(node)
-        self.assertEqual(self.history, [
+        self.assertEqual(self.call_history, [
             ('function', Fraction, 2),
             ('*arg', [3]),
             ('**arg', { 'denominator': 7 }),
             ('return', Fraction(3,7)),
         ])
+    
+    def test_trace_var_access(self):
+        """ Can we trace a variable access?
+        """
+        node = ast.parse('x')
+        ASTTraceTransformer('__trace__').visit(node)
+
+        self.exec_ast(node, env={'x': 1})
+        self.assertEqual(self.var_history, [
+            ('read', 'x', 1),
+        ])
+    
+    def test_trace_var_assign(self):
+        """ Can we trace a variable assignment?
+        """
+        node = ast.parse('x = 1')
+        ASTTraceTransformer('__trace__').visit(node)
+
+        env = self.exec_ast(node)
+        self.assertEqual(self.var_history, [
+            ('write', ['x'], 1),
+        ])
+        self.assertEqual(env['x'], 1)
+    
+    def test_trace_var_multiple_assign(self):
+        """ Can we trace a multiple variable assignment?
+        """
+        node = ast.parse('x = y = 1')
+        ASTTraceTransformer('__trace__').visit(node)
+
+        env = self.exec_ast(node)
+        self.assertEqual(self.var_history, [
+            ('write', ['x','y'], 1),
+        ])
+        self.assertEqual(env['x'], 1)
+        self.assertEqual(env['y'], 1)
+    
+    def test_trace_var_compound_assign(self):
+        """ Can we trace a compound variable assignment?
+        """
+        node = ast.parse('x, y = (0, 1)')
+        ASTTraceTransformer('__trace__').visit(node)
+
+        env = self.exec_ast(node)
+        self.assertEqual(self.var_history, [
+            ('write', [('x','y')], (0,1)),
+        ])
+        self.assertEqual(env['x'], 0)
+        self.assertEqual(env['y'], 1)
 
 
 class LoggingASTTracer(ASTTracer):
 
-    log = List()
+    call_history = List()
+    var_history = List()
 
     def _trace_function(self, func, nargs):
-        self.log.append(('function', func, nargs))
+        self.call_history.append(('function', func, nargs))
         return func
     
     def _trace_argument(self, arg_value, arg_name=None, nstars=0):
-        self.log.append(
+        self.call_history.append(
             ('*'*nstars + 'arg',
              (arg_name, arg_value) if arg_name else arg_value)
         )
         return arg_value
     
     def _trace_return(self, return_value):
-        self.log.append(('return', return_value))
+        self.call_history.append(('return', return_value))
         return return_value
+    
+    def _trace_access(self, name, value):
+        self.var_history.append(('read', name, value))
+        return value
+    
+    def _trace_assign(self, names, value):
+        self.var_history.append(('write', names, value))
+        return value
 
 
 if __name__ == '__main__':

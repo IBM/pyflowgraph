@@ -21,10 +21,10 @@ import types
 
 from traitlets import HasTraits, Any, Bool, Instance, Int, List
 
-from .ast_tracer import ASTTracer, TraceFunctionCalls
+from .ast_tracer import ASTTracer, ASTTraceTransformer
 from .ast_transform import AttributesToFunctions, IndexingToFunctions, \
     InplaceOperatorsToFunctions, OperatorsToFunctions, \
-    ContainerLiteralsToFunction
+    ContainerLiteralsToFunctions
 from .inspect_function import bind_arguments
 from .inspect_name import get_func_module_name, get_func_qual_name
 from .trace_event import TraceEvent, TraceValueEvent, TraceCall, TraceReturn
@@ -188,8 +188,8 @@ class Tracer(ASTTracer):
             IndexingToFunctions(operator_name),
             OperatorsToFunctions(operator_name),
             InplaceOperatorsToFunctions(operator_name),
-            ContainerLiteralsToFunction('__extra_operator__'),
-            TraceFunctionCalls('__trace__'),
+            ContainerLiteralsToFunctions('__extra_operator__'),
+            ASTTraceTransformer('__trace__'),
         ]
         for transformer in transformers:
             transformer.visit(node)

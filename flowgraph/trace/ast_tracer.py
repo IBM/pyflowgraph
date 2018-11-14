@@ -18,7 +18,7 @@ from __future__ import absolute_import
 
 import ast
 import sys
-from .ast_transform import to_attribute, to_call, to_name
+from .ast_transform import to_attribute, to_call, to_name, to_list, to_tuple
 
 from traitlets import HasTraits, Any
 
@@ -27,12 +27,11 @@ ast_has_starred = sys.version_info.major >= 3 and sys.version_info.minor >= 5
 
 
 class ASTTracer(HasTraits):
-    """ Trace function and method calls by AST rewriting.
+    """ Trace function calls and variable gets and sets by AST rewriting.
 
-    This class should be used with the `TraceFunctionCalls` AST transformer. 
-    It is very low-level and should be supplemented with additional logic to be
-    useful. The `Tracer` class in this subpackage shows how to do this in an
-    event-based way.
+    This class should be used with `ASTTraceTransformer`. It is very low-level
+    and should be supplemented with additional logic to be useful. The `Tracer`
+    class in this subpackage shows how to do this in an event-based way.
     """
 
     def trace_function(self, function, nargs):
@@ -49,6 +48,16 @@ class ASTTracer(HasTraits):
         """ Called after function returns.
         """
         return self._unbox(self._trace_return(return_value))
+    
+    def trace_access(self, name, value):
+        """ Called after a variable is accessed.
+        """
+        return self._unbox(self._trace_access(name, value))
+    
+    def trace_assign(self, names, value):
+        """ Called immediately before a variable is assigned.
+        """
+        return self._unbox(self._trace_assign(names, value))
     
     def _trace_function(self, function, args):
         """ Called after function object is evaluated.
@@ -71,37 +80,32 @@ class ASTTracer(HasTraits):
         """
         return return_value
     
+    def _trace_access(self, name, value):
+        """ Called after a variable is accessed.
+
+        May be reimplemented in subclass.
+        """
+        return value
+    
+    def _trace_assign(self, names, value):
+        """ Called immediately before a variable is assigned.
+
+        May be reimplemented in subclass.
+        """
+        return value
+    
     def _unbox(self, x):
         """ Unbox a value, if it is boxed.
         """
         return x.value if isinstance(x, BoxedValue) else x
 
 
-class TraceFunctionCalls(ast.NodeTransformer):
-    """ Rewrite AST to trace function and method calls.
-
-    Replaces function and method calls, e.g.
-
-        f(x,y,z=1)
-    
-    with wrapped calls, e.g.
-
-        trace_return(trace_function(f)(
-            trace_argument(x), trace_argument(y), z=trace_argument(1,'z')))
-    
-    The AST transformer allows boxed values (see `BoxedValue` type) to be
-    passed through compositions of trace calls via the '_trace_*' variants
-    of the `trace_*` methods. E.g., the `x` argument in the function call
-
-        f(x=g())
-    
-    becomes
-
-        ...(x=trace_argument(_trace_return(...), 'x'))
+class ASTTraceTransformer(ast.NodeTransformer):
+    """ Rewrite AST to trace function calls and variable gets and sets.
     """
 
     def __init__(self, tracer):
-        super(TraceFunctionCalls, self).__init__()
+        super(ASTTraceTransformer, self).__init__()
         self.tracer = to_name(tracer)
         self._allow_boxed = False
     
@@ -116,19 +120,39 @@ class TraceFunctionCalls(ast.NodeTransformer):
         """ Reimplemented to disable boxing on generic visits.
         """
         self._allow_boxed = False
-        return super(TraceFunctionCalls, self).generic_visit(node)
+        return super(ASTTraceTransformer, self).generic_visit(node)
     
-    def visit_boxed(self, node, boxed=True):
-        """ Visit node, allowing boxed values immediately but not recursively.
+    def visit_boxed(self, node):
+        """ Visit node, enabling boxed values immediately but not recursively.
         """
-        self._allow_boxed = boxed
+        self._allow_boxed = True
         return self.visit(node)
     
     def visit_Call(self, call):
-        """ Rewrite AST Call node.
+        """ Rewrite AST Call node with tracing.
+
+        Replaces function and method calls, e.g.
+
+            f(x,y,z=1)
+        
+        with wrapped calls, e.g.
+
+            trace_return(trace_function(f)(
+                trace_argument(x), trace_argument(y), z=trace_argument(1,'z')))
+        
+        The AST transformer allows boxed values (see `BoxedValue` type) to be
+        passed through compositions of trace calls via the '_trace_*' variants
+        of the `trace_*` methods. E.g., the `x` argument in the function call
+
+            f(x=g())
+        
+        becomes
+
+            ...(x=trace_argument(_trace_return(...), 'x'))
         """
         allowed_boxed = self._allow_boxed
-        func = self.visit_boxed(call.func, boxed=False)
+        self._allow_boxed = False
+        func = self.visit(call.func)
 
         # Visit positional and keyword arguments.
         args = [ self.visit_argument(arg) for arg in call.args ]
@@ -179,6 +203,51 @@ class TraceFunctionCalls(ast.NodeTransformer):
         if starred:
             call = ast.Starred(call, ast.Load())
         return call
+    
+    def visit_Name(self, name):
+        """ Rewrite AST Name node with tracing.
+
+        Replaces variable accesses, e.g. `x`, with wrapped accesses, e.g.
+
+            trace_access('x', x)
+        """
+        if isinstance(name.ctx, ast.Load):
+            return to_call(
+                self.tracer_method('trace_access', private=self._allow_boxed),
+                [ ast.Str(name.id), name ],
+            )
+        return name
+    
+    def visit_Assign(self, node):
+        """ Rewrite AST Assign node with tracing.
+
+        Replaces variable assignments, e.g.
+
+            x = y = 1
+        
+        with wrapped assignments, e.g.
+
+            x = y = trace_assign(['x','y'], 1)
+        """
+        allowed_boxed = self._allow_boxed
+        self.generic_visit(node)
+        node.value = to_call(
+            self.tracer_method('trace_assign', private=allowed_boxed),
+            [ to_list(map(self.target_to_literal, node.targets)), node.value ],
+        )
+        return node
+    
+    def target_to_literal(self, node):
+        """ Convert assignment target to AST literal node.
+        """
+        if isinstance(node, ast.Name):
+            return ast.Str(node.id)
+        elif isinstance(node, ast.Tuple):
+            return to_tuple(map(self.target_to_literal, node.elts))
+        elif isinstance(target, ast.List):
+            return to_list(map(self.target_to_literal, node.elts))
+        else:
+            raise TypeError("Unsupported assignment target %s" % node)
 
 
 class BoxedValue(HasTraits):
