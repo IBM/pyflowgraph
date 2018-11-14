@@ -93,15 +93,18 @@ class TraceReturn(TraceFunctionEvent, TraceValueEvent):
     # corresponding call event.
     arguments = Instance(OrderedDict)
 
-    # Number of return values, as estimated only by syntax.
+    # Number of return values, according to syntactic context.
+    #
+    # Like many programming languages, Python treats function inputs and outputs
+    # asymmetrically. A function can have many arguments, but only one return
+    # value. By convention, multiple return values are represented by returning
+    # a tuple or another sequence type. Because this is a matter of convention,
+    # any attempt to determine the "true"  or "logical" number of return values
+    # must be heuristic.
     #
     # In an ordinary assignment, `x = f()`, or function composition, `g(f())`,
     # this number will be 1, but in a compound assignment, `x, y = f()`, it will
     # be greater than 1.
-    #
-    # Note: Python supports multiple return values only implicitly, by returning
-    # tuples or other sequences. Any attempt to determine the "true"  or
-    # "logical" number of return values must ultimately be a heuristic.
     nvalues = Int(1)
 
 
