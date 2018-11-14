@@ -393,6 +393,16 @@ class TestFlowGraph(unittest.TestCase):
         self.assertEqual(port_data['qual_name'], 'module')
         self.assertEqual(port_data['value'], objects.__name__)
     
+    def test_variable_deletion(self):
+        """ Test that deleting a variable doesn't break anything.
+        """
+        actual = self.record("""
+            x = 1
+            del x
+        """)
+        target = new_flow_graph()
+        self.assert_isomorphic(actual, target)
+    
     def test_primitive_values(self):
         """ Test that primitive values passed by variables are recorded.
         """

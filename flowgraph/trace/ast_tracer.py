@@ -55,9 +55,14 @@ class ASTTracer(HasTraits):
         return self._unbox(self._trace_access(name, value))
     
     def trace_assign(self, names, value):
-        """ Called immediately before a variable is assigned.
+        """ Called before a variable is assigned.
         """
         return self._unbox(self._trace_assign(names, value))
+    
+    def trace_delete(self, names):
+        """ Called before a variable is deleted.
+        """
+        return self._trace_delete(names)
     
     def _trace_function(self, function, args):
         """ Called after function object is evaluated.
@@ -88,11 +93,17 @@ class ASTTracer(HasTraits):
         return value
     
     def _trace_assign(self, names, value):
-        """ Called immediately before a variable is assigned.
+        """ Called before a variable is assigned.
 
         May be reimplemented in subclass.
         """
         return value
+    
+    def _trace_delete(self, names):
+        """ Called before a variable is deleted.
+
+        May be reimplemented in subclass.
+        """
     
     def _unbox(self, x):
         """ Unbox a value, if it is boxed.
@@ -248,6 +259,26 @@ class ASTTraceTransformer(ast.NodeTransformer):
             return to_list(map(self.target_to_literal, node.elts))
         else:
             raise TypeError("Unsupported assignment target %s" % node)
+    
+    def visit_Delete(self, node):
+        """ Rewrite AST Delete node with tracing.
+
+        Replaces variable deletions, e.g.
+
+            del x, y
+        
+        with
+
+            trace_delete(['x','y'])
+            del x, y
+        """
+        self.generic_visit(node)
+        names = [ n.id for n in node.targets if isinstance(n, ast.Name) ]
+        names_node = to_list(ast.Str(name) for name in names)
+        return [
+            ast.Expr(to_call(self.tracer_method('trace_delete'), [names_node])),
+            node,
+        ]
 
 
 class BoxedValue(HasTraits):

@@ -115,6 +115,14 @@ class TraceAssign(TraceValueEvent):
     value_event = Instance(TraceValueEvent, allow_none=True)
 
 
+class TraceDelete(TraceEvent):
+    """ Event generated immediately before a variable is deleted.
+    """
+
+    # Names of variables to be deleted.
+    names = List()
+
+
 # XXX: Trait change notifications for `return_value` can lead to FutureWarning
 # from numpy: http://stackoverflow.com/questions/28337085
 import warnings

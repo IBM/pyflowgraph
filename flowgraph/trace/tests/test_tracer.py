@@ -22,7 +22,7 @@ import unittest
 
 from flowgraph.core.tests import objects
 from ..trace_event import TraceFunctionEvent, TraceCall, TraceReturn, \
-    TraceAccess, TraceAssign
+    TraceAccess, TraceAssign, TraceDelete
 from ..tracer import Tracer
 
 
@@ -60,7 +60,7 @@ class TestTracer(unittest.TestCase):
     def filter_trace_variable_event(self, event):
         """ Whether to save trace event related to variables.
         """
-        return isinstance(event, (TraceAccess, TraceAssign))
+        return isinstance(event, (TraceAccess, TraceAssign, TraceDelete))
     
     def trace(self, code, env=None):
         """ Trace code in environment with test objects.
@@ -216,7 +216,6 @@ class TestTracer(unittest.TestCase):
 
         events = self.variable_events
         self.assertEqual(len(events), 1)
-
         event = events[0]
         self.assertIsInstance(event, TraceAccess)
         self.assertEqual(event.name, 'x')
@@ -229,7 +228,6 @@ class TestTracer(unittest.TestCase):
 
         events = self.variable_events
         self.assertEqual(len(events), 1)
-
         event = events[0]
         self.assertIsInstance(event, TraceAssign)
         self.assertEqual(event.names, ['x'])
@@ -257,6 +255,17 @@ class TestTracer(unittest.TestCase):
         self.assertIsInstance(events[0], TraceAccess)
         self.assertIsInstance(events[1], TraceAssign)
         self.assertEqual(events[1].value_event, events[0])
+    
+    def test_variable_delete(self):
+        """ Are variable deletions traced?
+        """
+        self.trace('del x', env={'x': 1})
+
+        events = self.variable_events
+        self.assertEqual(len(events), 1)
+        event = events[0]
+        self.assertIsInstance(event, TraceDelete)
+        self.assertEqual(event.names, ['x'])
         
 
 

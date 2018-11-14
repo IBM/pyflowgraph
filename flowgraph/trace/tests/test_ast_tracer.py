@@ -210,6 +210,31 @@ class TestASTTracer(unittest.TestCase):
         ])
         self.assertEqual(env['x'], 0)
         self.assertEqual(env['y'], 1)
+    
+    def test_trace_var_delete(self):
+        """ Can we trace a variable deletion?
+        """
+        node = ast.parse('del x')
+        ASTTraceTransformer('__trace__').visit(node)
+        
+        env = self.exec_ast(node, env={'x': 1})
+        self.assertEqual(self.var_history, [
+            ('delete', ['x'])
+        ])
+        self.assertNotIn('x', env)
+    
+    def test_trace_var_multiple_delete(self):
+        """ Can we trace a multiple variable deletion?
+        """
+        node = ast.parse('del x, y')
+        ASTTraceTransformer('__trace__').visit(node)
+        
+        env = self.exec_ast(node, env={'x': 0, 'y': 1})
+        self.assertEqual(self.var_history, [
+            ('delete', ['x','y'])
+        ])
+        self.assertNotIn('x', env)
+        self.assertNotIn('y', env)
 
 
 class LoggingASTTracer(ASTTracer):
@@ -239,6 +264,9 @@ class LoggingASTTracer(ASTTracer):
     def _trace_assign(self, names, value):
         self.var_history.append(('write', names, value))
         return value
+
+    def _trace_delete(self, names):
+        self.var_history.append(('delete', names))
 
 
 if __name__ == '__main__':

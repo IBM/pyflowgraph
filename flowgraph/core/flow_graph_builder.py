@@ -29,7 +29,7 @@ from flowgraph.trace.inspect_name import get_class_module_name, \
     get_class_qual_name
 from flowgraph.trace.object_tracker import ObjectTracker
 from flowgraph.trace.trace_event import TraceEvent, TraceCall, TraceReturn, \
-    TraceAccess, TraceAssign
+    TraceAccess, TraceAssign, TraceDelete
 from .annotator import Annotator
 from .flow_graph import new_flow_graph
 
@@ -86,6 +86,8 @@ class FlowGraphBuilder(HasTraits):
             self._push_access_event(event)
         elif isinstance(event, TraceAssign):
             self._push_assign_event(event)
+        elif isinstance(event, TraceDelete):
+            self._push_delete_event(event)
     
     def reset(self):
         """ Reset the flow graph builder.
@@ -264,6 +266,13 @@ class FlowGraphBuilder(HasTraits):
         if source is not None:
             for name in event.names:
                 context.variable_table[name] = source
+    
+    def _push_delete_event(self, event):
+        """ Clean variable table in response to variable deletion event.
+        """
+        context = self._stack[-1]
+        for name in event.names:
+            context.variable_table.pop(name, None)
         
     def _add_call_node(self, event, annotation):
         """ Add a new call node for a call event.

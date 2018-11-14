@@ -28,7 +28,7 @@ from .ast_transform import AttributesToFunctions, IndexingToFunctions, \
 from .inspect_function import bind_arguments
 from .inspect_name import get_func_module_name, get_func_qual_name
 from .trace_event import TraceEvent, TraceValueEvent, TraceCall, TraceReturn, \
-    TraceAccess, TraceAssign
+    TraceAccess, TraceAssign, TraceDelete
 
 # Modules needed for tracer execution environment.
 import operator
@@ -180,7 +180,7 @@ class Tracer(ASTTracer):
         return value
     
     def _trace_assign(self, names, value):
-        """ Called immediately before a variable is assigned.
+        """ Called before a variable is assigned.
         """
         scope = self._stack[-1]
 
@@ -197,6 +197,13 @@ class Tracer(ASTTracer):
             return event
         
         return value
+    
+    def _trace_delete(self, names):
+        """ Called before a variable is deleted.
+        """
+        scope = self._stack[-1]
+        if scope.emit_events:
+            self.event = TraceDelete(names=names)
     
     # Protected interface
 
