@@ -246,12 +246,12 @@ class OperatorsToFunctions(ast.NodeTransformer):
             return to_call(self.op_to_function(op), [node.left, comparator])
 
 
-class ContainerLiteralsToFunction(ast.NodeTransformer):
+class ContainerLiteralsToFunctions(ast.NodeTransformer):
     """ Replace container literals with function calls.
     """
 
     def __init__(self, operator_module=None):
-        super(ContainerLiteralsToFunction, self).__init__()
+        super(ContainerLiteralsToFunctions, self).__init__()
         self.operator = to_name(operator_module or 'operator')
     
     def visit_List(self, node):
@@ -319,6 +319,16 @@ def to_name_constant(value):
         return ast.NameConstant(value)
     else:
         return to_name(str(value))
+
+def to_list(elts, ctx=None):
+    """ Create a List AST node.
+    """
+    return ast.List(list(elts), ctx or ast.Load())
+
+def to_tuple(elts, ctx=None):
+    """ Create a Tuple AST node.
+    """
+    return ast.Tuple(list(elts), ctx or ast.Load())
 
 def set_ctx(node, ctx=None):
     """ Replace AST context without mutation.

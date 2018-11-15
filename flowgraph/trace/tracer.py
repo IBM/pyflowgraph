@@ -21,13 +21,14 @@ import types
 
 from traitlets import HasTraits, Any, Bool, Instance, Int, List
 
-from .ast_tracer import ASTTracer, TraceFunctionCalls
+from .ast_tracer import ASTTracer, ASTTraceTransformer
 from .ast_transform import AttributesToFunctions, IndexingToFunctions, \
     InplaceOperatorsToFunctions, OperatorsToFunctions, \
-    ContainerLiteralsToFunction
+    ContainerLiteralsToFunctions
 from .inspect_function import bind_arguments
 from .inspect_name import get_func_module_name, get_func_qual_name
-from .trace_event import TraceEvent, TraceValueEvent, TraceCall, TraceReturn
+from .trace_event import TraceEvent, TraceValueEvent, TraceCall, TraceReturn, \
+    TraceAccess, TraceAssign, TraceDelete
 
 # Modules needed for tracer execution environment.
 import operator
@@ -157,14 +158,52 @@ class Tracer(ASTTracer):
         scope = _ScopeItem(event=event, emit_events=emit_events)
         self._stack.append(scope)
     
-    def _trace_return(self, return_value):
+    def _trace_return(self, return_value, nvalues):
         """ Called after function returns.
         """
         scope = self._stack.pop()
-        event = self._create_return_event(scope.event, return_value)
+        event = self._create_return_event(scope.event, return_value, nvalues)
         if scope.emit_events:
             self.event = event
         return event
+    
+    def _trace_access(self, name, value):
+        """ Called after a variable is accessed.
+        """
+        scope = self._stack[-1]
+
+        # Create access event.
+        if scope.emit_events:
+            self.event = event = TraceAccess(name=name, value=value)
+            return event
+        
+        return value
+    
+    def _trace_assign(self, names, value):
+        """ Called before a variable is assigned.
+        """
+        scope = self._stack[-1]
+
+        if isinstance(value, TraceValueEvent):
+            value_event = value
+            value = value_event.value
+        else:
+            value_event = None
+
+        # Create assign event.
+        if scope.emit_events:
+            self.event = event = TraceAssign(
+                names=names, value=value, value_event=value_event)
+            return event
+        
+        return value
+    
+    def _trace_delete(self, names):
+        """ Called before a variable is deleted.
+        """
+        scope = self._stack[-1]
+        if scope.emit_events:
+            self.event = TraceDelete(names=names)
     
     # Protected interface
 
@@ -188,8 +227,8 @@ class Tracer(ASTTracer):
             IndexingToFunctions(operator_name),
             OperatorsToFunctions(operator_name),
             InplaceOperatorsToFunctions(operator_name),
-            ContainerLiteralsToFunction('__extra_operator__'),
-            TraceFunctionCalls('__trace__'),
+            ContainerLiteralsToFunctions('__extra_operator__'),
+            ASTTraceTransformer('__trace__'),
         ]
         for transformer in transformers:
             transformer.visit(node)
@@ -215,14 +254,14 @@ class Tracer(ASTTracer):
                          module_name=module_name, qual_name=qual_name,
                          arguments=arguments, argument_events=argument_events)
     
-    def _create_return_event(self, call_event, return_value):
+    def _create_return_event(self, call_event, return_value, nvalues):
         """ Create trace event for function return.
         """
         call = call_event
         return TraceReturn(tracer=self, function=call.function,
                            atomic=call.atomic, module_name=call.module_name,
-                           qual_name=call.qual_name, value=return_value,
-                           arguments=call.arguments)
+                           qual_name=call.qual_name, arguments=call.arguments, 
+                           value=return_value, nvalues=nvalues)
 
 
 class _ScopeItem(HasTraits):

@@ -21,7 +21,8 @@ import types
 import unittest
 
 from flowgraph.core.tests import objects
-from ..trace_event import TraceFunctionEvent, TraceCall, TraceReturn
+from ..trace_event import TraceFunctionEvent, TraceCall, TraceReturn, \
+    TraceAccess, TraceAssign, TraceDelete
 from ..tracer import Tracer
 
 
@@ -33,27 +34,39 @@ class TestTracer(unittest.TestCase):
         """ Create the tracer and set a handler for trace events.
         """
         self.tracer = Tracer()        
-        self.events = []
+        self.function_events = []
+        self.variable_events = []
         def handler(changed):
             event = changed['new']
-            if event and self.filter_trace_event(event):
-                self.events.append(event)
+            if self.filter_trace_function_event(event):
+                self.function_events.append(event)
+            elif self.filter_trace_variable_event(event):
+                self.variable_events.append(event)
         self.tracer.observe(handler, 'event')
     
-    def filter_trace_event(self, event):
-        """ Whether to keep trace event.
+    def filter_trace_function_event(self, event):
+        """ Whether to save trace event related to function calls.
         """
-        if isinstance(event, TraceFunctionEvent) and event.function is getattr:
+        if not isinstance(event, TraceFunctionEvent):
+            return False
+
+        if event.function is getattr:
             # Ignore attribute access on modules.
-            first_arg = next(iter(event.arguments.values()))
+            first_arg = list(event.arguments.values())[0]
             return not isinstance(first_arg, types.ModuleType)
 
         return True
     
-    def trace(self, code):
+    def filter_trace_variable_event(self, event):
+        """ Whether to save trace event related to variables.
+        """
+        return isinstance(event, (TraceAccess, TraceAssign, TraceDelete))
+    
+    def trace(self, code, env=None):
         """ Trace code in environment with test objects.
         """
-        env = dict(objects=objects)
+        env = env or {}
+        env.update(dict(objects=objects))
         return self.tracer.trace(dedent(code), env=env)
     
     def test_basic_call(self):
@@ -64,11 +77,11 @@ class TestTracer(unittest.TestCase):
             bar = objects.bar_from_foo(foo, x=1, y=2)
         """)
         
-        events = self.events
+        events = self.function_events
         self.assertEqual(len(events), 4)
         
         event = events[2]
-        self.assertTrue(isinstance(event, TraceCall))
+        self.assertIsInstance(event, TraceCall)
         self.assertTrue(event.atomic)
         self.assertEqual(event.function, objects.bar_from_foo)
         self.assertEqual(event.module_name, objects.__name__)
@@ -78,7 +91,7 @@ class TestTracer(unittest.TestCase):
         ]))
         
         event = events[3]
-        self.assertTrue(isinstance(event, TraceReturn))
+        self.assertIsInstance(event, TraceReturn)
         self.assertTrue(event.atomic)
         self.assertEqual(event.function, objects.bar_from_foo)
         self.assertEqual(event.module_name, objects.__name__)
@@ -91,11 +104,11 @@ class TestTracer(unittest.TestCase):
             foo = objects.create_foo()
         """)
         
-        events = self.events
+        events = self.function_events
         self.assertEqual(len(events), 2)
         
         event = events[0]
-        self.assertTrue(isinstance(event, TraceCall))
+        self.assertIsInstance(event, TraceCall)
         self.assertTrue(event.atomic)
         self.assertEqual(event.function, objects.create_foo)
         self.assertEqual(event.module_name, objects.__name__)
@@ -103,7 +116,7 @@ class TestTracer(unittest.TestCase):
         self.assertEqual(event.arguments, OrderedDict())
         
         event = events[1]
-        self.assertTrue(isinstance(event, TraceReturn))
+        self.assertIsInstance(event, TraceReturn)
         self.assertTrue(event.atomic)
         self.assertEqual(event.function, objects.create_foo)
         self.assertEqual(event.module_name, objects.__name__)
@@ -117,10 +130,10 @@ class TestTracer(unittest.TestCase):
             foo = objects.nested_create_foo()
         """)
         
-        events = self.events
+        events = self.function_events
         self.assertEqual(len(events), 2)
-        self.assertTrue(isinstance(events[0], TraceCall))
-        self.assertTrue(isinstance(events[1], TraceReturn))
+        self.assertIsInstance(events[0], TraceCall)
+        self.assertIsInstance(events[1], TraceReturn)
         self.assertTrue(events[0].atomic)
         self.assertTrue(events[1].atomic)
         self.assertEqual(events[0].qual_name, 'nested_create_foo')
@@ -136,7 +149,7 @@ class TestTracer(unittest.TestCase):
             baz = objects.baz_from_foo(foo)
         """)
         
-        events = self.events
+        events = self.function_events
         self.assertEqual(len(events), 8)
         self.assertEqual(events[0].qual_name, 'Foo')
         self.assertEqual(events[2].qual_name, 'getattr')
@@ -152,7 +165,7 @@ class TestTracer(unittest.TestCase):
             foo2 = container.foo
         """)
         
-        events = self.events
+        events = self.function_events
         self.assertEqual(len(events), 6)
         self.assertEqual(events[0].qual_name, 'FooContainer')
         self.assertEqual(events[2].qual_name, 'getattr')
@@ -171,7 +184,7 @@ class TestTracer(unittest.TestCase):
             container.foo = objects.Foo()
         """)
         
-        events = self.events
+        events = self.function_events
         self.assertEqual(len(events), 6)
         self.assertEqual(events[0].qual_name, 'FooContainer')
         self.assertEqual(events[2].qual_name, 'Foo')
@@ -185,9 +198,9 @@ class TestTracer(unittest.TestCase):
     def test_boxed_return(self):
         """ Can the tracer pass boxed values from a function return?
         """
-        env = self.trace("objects.bar_from_foo(objects.Foo())")
+        self.trace("objects.bar_from_foo(objects.Foo())")
         
-        events = self.events
+        events = self.function_events
         self.assertEqual(len(events), 4)
         self.assertEqual(events[2].qual_name, 'bar_from_foo')
         self.assertIsInstance(events[2].arguments['foo'], objects.Foo)
@@ -195,6 +208,79 @@ class TestTracer(unittest.TestCase):
         event = events[2].argument_events['foo']
         self.assertIsInstance(event, TraceReturn)
         self.assertEqual(event.qual_name, 'Foo')
+    
+    def test_variable_access(self):
+        """ Are variable accesses traced?
+        """
+        self.trace('x', env={'x': 1})
+
+        events = self.variable_events
+        self.assertEqual(len(events), 1)
+        event = events[0]
+        self.assertIsInstance(event, TraceAccess)
+        self.assertEqual(event.name, 'x')
+        self.assertEqual(event.value, 1)
+    
+    def test_variable_assign(self):
+        """ Are variable assignments traced?
+        """
+        self.trace('x = 1')
+
+        events = self.variable_events
+        self.assertEqual(len(events), 1)
+        event = events[0]
+        self.assertIsInstance(event, TraceAssign)
+        self.assertEqual(event.names, ['x'])
+        self.assertEqual(event.value, 1)
+    
+    def test_variable_assign_boxed_return(self):
+        """ Can the tracer pass boxed return values to variable assignments?
+        """
+        env = self.trace('foo = objects.Foo()')
+
+        events = self.variable_events
+        event = next(evt for evt in events if isinstance(evt, TraceAssign))
+        self.assertEqual(event.names, ['foo'])
+        self.assertEqual(event.value, env['foo'])
+        self.assertIsInstance(event.value_event, TraceReturn)
+        self.assertEqual(event.value_event.function, objects.Foo)
+        self.assertEqual(event.value_event.nvalues, 1)
+
+    def test_variable_compound_assign_boxed_return(self):
+        """ Can the tracer pass boxed return values to a compound assignment?
+        """
+        env = self.trace('foo, bar = objects.create_foo_and_bar()')
+
+        events = self.variable_events
+        event = next(evt for evt in events if isinstance(evt, TraceAssign))
+        self.assertEqual(event.names, [('foo','bar')])
+        self.assertEqual(event.value, (env['foo'],env['bar']))
+        self.assertIsInstance(event.value_event, TraceReturn)
+        self.assertEqual(event.value_event.function, objects.create_foo_and_bar)
+        self.assertEqual(event.value_event.nvalues, 2)
+    
+    def test_variable_assign_boxed_access(self):
+        """ Can the tracer pass boxed variable values to variable assignments?
+        """
+        self.trace('y = x', env={'x': 1})
+
+        events = self.variable_events
+        self.assertEqual(len(events), 2)
+        self.assertIsInstance(events[0], TraceAccess)
+        self.assertIsInstance(events[1], TraceAssign)
+        self.assertEqual(events[1].value_event, events[0])
+    
+    def test_variable_delete(self):
+        """ Are variable deletions traced?
+        """
+        self.trace('del x', env={'x': 1})
+
+        events = self.variable_events
+        self.assertEqual(len(events), 1)
+        event = events[0]
+        self.assertIsInstance(event, TraceDelete)
+        self.assertEqual(event.names, ['x'])
+        
 
 
 if __name__ == '__main__':

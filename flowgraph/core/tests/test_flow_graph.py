@@ -393,7 +393,36 @@ class TestFlowGraph(unittest.TestCase):
         self.assertEqual(port_data['qual_name'], 'module')
         self.assertEqual(port_data['value'], objects.__name__)
     
-    @unittest.skip("Static analysis for sequence literals not implemented")
+    def test_variable_deletion(self):
+        """ Test that deleting a variable doesn't break anything.
+        """
+        actual = self.record("""
+            x = 1
+            del x
+        """)
+        target = new_flow_graph()
+        self.assert_isomorphic(actual, target)
+    
+    def test_primitive_values(self):
+        """ Test that primitive values passed by variables are recorded.
+        """
+        actual = self.record("""
+            foo = objects.Foo()
+            x = foo.do_sum()
+            new_foo = objects.Foo(x)
+        """)
+
+        target = new_flow_graph()
+        outputs = target.graph['output_node']
+        target.add_node('foo', qual_name='Foo')
+        target.add_node('sum', qual_name='Foo.do_sum')
+        target.add_node('new_foo', qual_name='Foo')
+        target.add_edge('foo', outputs, sourceport='__return__')
+        target.add_edge('foo', 'sum', sourceport='__return__', targetport='self')
+        target.add_edge('sum', 'new_foo', sourceport='__return__', targetport='x')
+        target.add_edge('new_foo', outputs, sourceport='__return__')
+        self.assert_isomorphic(actual, target, check_id=False)
+    
     def test_track_inside_list(self):
         """ Test a function call with tracked objects inside a list.
         """
@@ -406,15 +435,17 @@ class TestFlowGraph(unittest.TestCase):
         
         target = new_flow_graph()
         outputs = target.graph['output_node']
-        target.add_node('1', qual_name='Foo')
-        target.add_node('2', qual_name='Foo')
-        target.add_node('3', qual_name='foo_x_sum')
-        target.add_edge('1', '3', id=self.id('foo1'),
-                        sourceport='__return__', targetport='foos')
-        target.add_edge('2', '3', id=self.id('foo2'),
-                        sourceport='__return__', targetport='foos')
-        target.add_edge('1', outputs, id=self.id('foo1'), sourceport='__return__')
-        target.add_edge('2', outputs, id=self.id('foo2'), sourceport='__return__')
+        target.add_node('foo1', qual_name='Foo')
+        target.add_node('foo2', qual_name='Foo')
+        target.add_node('list', qual_name='__list__')
+        target.add_node('foo_x_sum', qual_name='foo_x_sum')
+        target.add_edge('foo1', 'list', id=self.id('foo1'),
+                        sourceport='__return__', targetport='0')
+        target.add_edge('foo2', 'list', id=self.id('foo2'),
+                        sourceport='__return__', targetport='1')
+        target.add_edge('list', 'foo_x_sum', sourceport='__return__', targetport='foos')
+        target.add_edge('foo1', outputs, id=self.id('foo1'), sourceport='__return__')
+        target.add_edge('foo2', outputs, id=self.id('foo2'), sourceport='__return__')
         self.assert_isomorphic(actual, target)
     
     def test_function_annotations(self):

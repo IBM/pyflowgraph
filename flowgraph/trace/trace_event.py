@@ -16,7 +16,7 @@ from __future__ import absolute_import
 
 from collections import OrderedDict
 
-from traitlets import HasTraits, Any, Bool, Dict, Instance, Unicode
+from traitlets import HasTraits, Any, Bool, Dict, Instance, Int, List, Unicode
 
 from .ast_tracer import BoxedValue
 
@@ -72,7 +72,8 @@ class TraceCall(TraceFunctionEvent):
     """
     
     # Mapping from argument name to argument value.
-    # The ordering of the arguments is that of the function definition.
+    #
+    # The arguments are ordered according to the function definition.
     arguments = Instance(OrderedDict)
 
     # Mapping from argument name to argument's parent event, if any.
@@ -86,10 +87,56 @@ class TraceReturn(TraceFunctionEvent, TraceValueEvent):
     """
     
     # Map from argument name to argument value.
+    #
     # Warning: if an argument has pass-by-reference semantics (as most types
     # in Python do), the argument may be mutated from its state in the 
     # corresponding call event.
     arguments = Instance(OrderedDict)
+
+    # Number of return values, according to syntactic context.
+    #
+    # Like many programming languages, Python treats function inputs and outputs
+    # asymmetrically. A function can have many arguments, but only one return
+    # value. By convention, multiple return values are represented by returning
+    # a tuple or another sequence type. Because this is a matter of convention,
+    # any attempt to determine the "true"  or "logical" number of return values
+    # must be heuristic.
+    #
+    # In an ordinary assignment, `x = f()`, or function composition, `g(f())`,
+    # this number will be 1, but in a compound assignment, `x, y = f()`, it will
+    # be greater than 1.
+    nvalues = Int(1)
+
+
+class TraceAccess(TraceValueEvent):
+    """ Event generated immediately after a variable is accessed.
+
+    The variable's value is stored in the `value` attribute.
+    """
+
+    # Name of variable that was accessed.
+    name = Unicode()
+
+
+class TraceAssign(TraceValueEvent):
+    """ Event generated immediately before a variable is assigned.
+
+    The value to be assigned is stored in the `value` attribute.
+    """
+
+    # Names of variables to be assigned.
+    names = List()
+
+    # Parent event of value, if any.
+    value_event = Instance(TraceValueEvent, allow_none=True)
+
+
+class TraceDelete(TraceEvent):
+    """ Event generated immediately before a variable is deleted.
+    """
+
+    # Names of variables to be deleted.
+    names = List()
 
 
 # XXX: Trait change notifications for `return_value` can lead to FutureWarning
