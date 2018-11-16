@@ -50,7 +50,6 @@ def safe_execute(code, kc, **kwargs):
     return content
 
 
-@unittest.skip("Custom IPython kernel broken in IPython v7.0")
 class TestFlowGraphKernel(unittest.TestCase):
     """ Tests the Flow Graph IPython kernel.
     """
@@ -59,6 +58,8 @@ class TestFlowGraphKernel(unittest.TestCase):
     def setUpClass(cls):
         """ Launch kernel and set search path for annotator.
         """
+        raise unittest.SkipTest("Custom IPython kernel broken in IPython v7.0")
+
         tu.KM, tu.KC = tu.start_new_kernel(kernel_name=get_kernel_name())
         
         objects_path = Path(test_objects.__file__).parent
