@@ -105,17 +105,17 @@ class IntegrationTestFlowGraph(unittest.TestCase):
         target.add_node('lin1', qual_name='linspace')
         target.add_node('lin2', qual_name='linspace')
         target.add_node('meshgrid', qual_name='meshgrid')
-        target.add_edge('lin1', 'meshgrid', sourceport='__return__', targetport='0',
+        target.add_edge('lin1', 'meshgrid', sourceport='return', targetport='0',
                         annotation='python/numpy/ndarray')
-        target.add_edge('lin2', 'meshgrid', sourceport='__return__', targetport='1',
+        target.add_edge('lin2', 'meshgrid', sourceport='return', targetport='1',
                         annotation='python/numpy/ndarray')
-        target.add_edge('lin1', outputs, sourceport='__return__',
+        target.add_edge('lin1', outputs, sourceport='return',
                         annotation='python/numpy/ndarray')
-        target.add_edge('lin2', outputs, sourceport='__return__',
+        target.add_edge('lin2', outputs, sourceport='return',
                         annotation='python/numpy/ndarray')
-        target.add_edge('meshgrid', outputs, sourceport='__return__.0',
+        target.add_edge('meshgrid', outputs, sourceport='return.0',
                         annotation='python/numpy/ndarray')
-        target.add_edge('meshgrid', outputs, sourceport='__return__.1',
+        target.add_edge('meshgrid', outputs, sourceport='return.1',
                         annotation='python/numpy/ndarray')
         self.assert_isomorphic(graph, target)
     
@@ -132,11 +132,11 @@ class IntegrationTestFlowGraph(unittest.TestCase):
         target.add_node('shape', qual_name='getattr', slot='shape',
                         annotation='python/numpy/ndarray')
         target.add_node('reshape', qual_name='ndarray.reshape')
-        target.add_edge('rand', 'shape', sourceport='__return__', targetport='0',
+        target.add_edge('rand', 'shape', sourceport='return', targetport='0',
                         annotation='python/numpy/ndarray')
-        target.add_edge('arange', 'reshape', sourceport='__return__', targetport='0',
+        target.add_edge('arange', 'reshape', sourceport='return', targetport='0',
                         annotation='python/numpy/ndarray')
-        target.add_edge('shape', 'reshape', sourceport='__return__', targetport='1')
+        target.add_edge('shape', 'reshape', sourceport='return', targetport='1')
         self.assert_isomorphic(graph, target)
     
     def test_numpy_slice(self):
@@ -152,11 +152,11 @@ class IntegrationTestFlowGraph(unittest.TestCase):
         target.add_node('extslice', qual_name='__tuple__')
         target.add_node('getitem', qual_name='getitem')
         target.add_node('gt', qual_name='gt')
-        target.add_edge('rand', 'getitem', sourceport='__return__', targetport='0',
+        target.add_edge('rand', 'getitem', sourceport='return', targetport='0',
                         annotation='python/numpy/ndarray')
-        target.add_edge('slice', 'extslice', sourceport='__return__', targetport='0')
-        target.add_edge('extslice', 'getitem', sourceport='__return__', targetport='1')
-        target.add_edge('getitem', 'gt', sourceport='__return__', targetport='0',
+        target.add_edge('slice', 'extslice', sourceport='return', targetport='0')
+        target.add_edge('extslice', 'getitem', sourceport='return', targetport='1')
+        target.add_edge('getitem', 'gt', sourceport='return', targetport='0',
                         annotation='python/numpy/ndarray')
         self.assert_isomorphic(graph, target)
     
@@ -170,11 +170,11 @@ class IntegrationTestFlowGraph(unittest.TestCase):
         target.add_node('read_table', qual_name='read_sql_table',
                         annotation='python/pandas/read-sql-table')
         target.add_edge('create_engine', 'read_table',
-                        sourceport='__return__', targetport='con',
+                        sourceport='return', targetport='con',
                         annotation='python/sqlalchemy/engine')
-        target.add_edge('create_engine', outputs, sourceport='__return__',
+        target.add_edge('create_engine', outputs, sourceport='return',
                         annotation='python/sqlalchemy/engine')
-        target.add_edge('read_table', outputs, sourceport='__return__',
+        target.add_edge('read_table', outputs, sourceport='return',
                         annotation='python/pandas/data-frame')
         self.assert_isomorphic(graph, target)
     
@@ -192,9 +192,9 @@ class IntegrationTestFlowGraph(unittest.TestCase):
         target.add_node('kmeans', qual_name='kmeans2',
                         annotation='python/scipy/kmeans2')
         target.add_edge('read', 'delete', annotation='python/numpy/ndarray',
-                        sourceport='__return__', targetport='arr')
+                        sourceport='return', targetport='arr')
         target.add_edge('delete', 'kmeans', annotation='python/numpy/ndarray',
-                        sourceport='__return__', targetport='data')
+                        sourceport='return', targetport='data')
         self.assert_isomorphic(graph, target)
     
     @unittest.skipUnless(six.PY3, "pd.read_csv needs Py2-compatible annotation")
@@ -211,9 +211,9 @@ class IntegrationTestFlowGraph(unittest.TestCase):
         target.add_node('drop', qual_name='DataFrame.drop')
         target.add_node('values', qual_name='getattr', slot='values')
         target.add_edge('read', 'drop', annotation='python/pandas/data-frame',
-                        sourceport='__return__', targetport='self')
+                        sourceport='return', targetport='self')
         target.add_edge('drop', 'values', annotation='python/pandas/data-frame',
-                        sourceport='__return__', targetport='0')
+                        sourceport='return', targetport='0')
         target.add_node('kmeans', qual_name='KMeans',
                         annotation='python/sklearn/k-means')
         target.add_node('fit', qual_name='KMeans.fit',
@@ -221,9 +221,9 @@ class IntegrationTestFlowGraph(unittest.TestCase):
         target.add_node('clusters', qual_name='getattr', slot='labels_',
                         annotation='python/sklearn/k-means')
         target.add_edge('kmeans', 'fit', annotation='python/sklearn/k-means',
-                        sourceport='__return__', targetport='self')
+                        sourceport='return', targetport='self')
         target.add_edge('values', 'fit', annotation='python/numpy/ndarray',
-                        sourceport='__return__', targetport='X')
+                        sourceport='return', targetport='X')
         target.add_edge('fit', 'clusters', annotation='python/sklearn/k-means',
                         sourceport='self!', targetport='0')
         self.assert_isomorphic(graph, target)
@@ -249,22 +249,22 @@ class IntegrationTestFlowGraph(unittest.TestCase):
                         annotation='python/sklearn/fit-predict-clustering')
         target.add_node('score', qual_name='mutual_info_score')
         target.add_edge('kmeans', 'fit_kmeans',
-                        sourceport='__return__', targetport='self',
+                        sourceport='return', targetport='self',
                         annotation='python/sklearn/k-means')
         target.add_edge('make_blobs', 'fit_kmeans',
-                        sourceport='__return__.0', targetport='X',
+                        sourceport='return.0', targetport='X',
                         annotation='python/numpy/ndarray')
         target.add_edge('agglom', 'fit_agglom',
-                        sourceport='__return__', targetport='self',
+                        sourceport='return', targetport='self',
                         annotation='python/sklearn/agglomerative')
         target.add_edge('make_blobs', 'fit_agglom',
-                        sourceport='__return__.0', targetport='X',
+                        sourceport='return.0', targetport='X',
                         annotation='python/numpy/ndarray')
         target.add_edge('fit_kmeans', 'score',
-                        sourceport='__return__', targetport='labels_true',
+                        sourceport='return', targetport='labels_true',
                         annotation='python/numpy/ndarray')
         target.add_edge('fit_agglom', 'score',
-                        sourceport='__return__', targetport='labels_pred',
+                        sourceport='return', targetport='labels_pred',
                         annotation='python/numpy/ndarray')
         self.assert_isomorphic(graph, target)
     
@@ -291,27 +291,27 @@ class IntegrationTestFlowGraph(unittest.TestCase):
                         annotation='python/sklearn/mean-absolute-error')
         target.add_node('l2', qual_name='mean_squared_error',
                         annotation='python/sklearn/mean-squared-error')
-        target.add_edge('read', 'X', sourceport='__return__', targetport='self',
+        target.add_edge('read', 'X', sourceport='return', targetport='self',
                         annotation='python/pandas/data-frame')
-        target.add_edge('read', 'y', sourceport='__return__', targetport='0',
+        target.add_edge('read', 'y', sourceport='return', targetport='0',
                         annotation='python/pandas/data-frame')
-        target.add_edge('lm', 'fit', sourceport='__return__', targetport='self',
+        target.add_edge('lm', 'fit', sourceport='return', targetport='self',
                         annotation='python/sklearn/linear-regression')
-        target.add_edge('X', 'fit', sourceport='__return__', targetport='X',
+        target.add_edge('X', 'fit', sourceport='return', targetport='X',
                         annotation='python/pandas/data-frame')
-        target.add_edge('y', 'fit', sourceport='__return__', targetport='y',
+        target.add_edge('y', 'fit', sourceport='return', targetport='y',
                         annotation='python/pandas/series')
         target.add_edge('fit', 'predict', sourceport='self!', targetport='self',
                         annotation='python/sklearn/linear-regression')
-        target.add_edge('X', 'predict', sourceport='__return__', targetport='X',
+        target.add_edge('X', 'predict', sourceport='return', targetport='X',
                         annotation='python/pandas/data-frame')
-        target.add_edge('y', 'l1', sourceport='__return__', targetport='y_true',
+        target.add_edge('y', 'l1', sourceport='return', targetport='y_true',
                         annotation='python/pandas/series')
-        target.add_edge('predict', 'l1', sourceport='__return__', targetport='y_pred',
+        target.add_edge('predict', 'l1', sourceport='return', targetport='y_pred',
                         annotation='python/numpy/ndarray')
-        target.add_edge('y', 'l2', sourceport='__return__', targetport='y_true',
+        target.add_edge('y', 'l2', sourceport='return', targetport='y_true',
                         annotation='python/pandas/series')
-        target.add_edge('predict', 'l2', sourceport='__return__', targetport='y_pred',
+        target.add_edge('predict', 'l2', sourceport='return', targetport='y_pred',
                         annotation='python/numpy/ndarray')
         self.assert_isomorphic(graph, target)
     
@@ -333,21 +333,21 @@ class IntegrationTestFlowGraph(unittest.TestCase):
                         qual_name=('RegressionModel' if six.PY3 else 'OLS') + '.fit',
                         annotation='python/statsmodels/fit')
         target.add_edge('read', 'read-get',
-                        sourceport='__return__', targetport='0',
+                        sourceport='return', targetport='0',
                         annotation='python/statsmodels/dataset')
         target.add_edge('read-get', 'ols',
-                        sourceport='__return__', targetport='data',
+                        sourceport='return', targetport='data',
                         annotation='python/pandas/data-frame')
         target.add_edge('ols', 'fit',
-                        sourceport='__return__', targetport='self',
+                        sourceport='return', targetport='self',
                         annotation='python/statsmodels/ols')
-        target.add_edge('read', outputs, sourceport='__return__',
+        target.add_edge('read', outputs, sourceport='return',
                         annotation='python/statsmodels/dataset')
-        target.add_edge('read-get', outputs, sourceport='__return__',
+        target.add_edge('read-get', outputs, sourceport='return',
                         annotation='python/pandas/data-frame')
-        target.add_edge('ols', outputs, sourceport='__return__',
+        target.add_edge('ols', outputs, sourceport='return',
                         annotation='python/statsmodels/ols')
-        target.add_edge('fit', outputs, sourceport='__return__',
+        target.add_edge('fit', outputs, sourceport='return',
                         annotation='python/statsmodels/regression-results-wrapper')
         self.assert_isomorphic(graph, target)
 

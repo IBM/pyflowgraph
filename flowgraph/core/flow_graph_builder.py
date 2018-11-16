@@ -203,13 +203,13 @@ class FlowGraphBuilder(HasTraits):
                 value_id = self.object_tracker.maybe_track(value)
                 if value_id:
                     self._set_object_output_node(
-                        event, value, value_id, node, '__return__.%i' % i)
+                        event, value, value_id, node, 'return.%i' % i)
         else:
             # All other objects are treated as a single return value.
             return_id = self.object_tracker.maybe_track(return_value)
             if return_id:
                 self._set_object_output_node(
-                    event, return_value, return_id, node, '__return__')
+                    event, return_value, return_id, node, 'return')
         
         # Set outputs for mutated arguments.
         annotation = self.annotator.notate_function(event.function) or {}
@@ -220,7 +220,7 @@ class FlowGraphBuilder(HasTraits):
                 self._set_object_output_node(event, arg, arg_id, node, port)
         
         # Update event table with node.
-        context.event_table[event] = (node, '__return__')
+        context.event_table[event] = (node, 'return')
         
         # Update node and port data for this call.
         self._update_call_node_for_return(event, annotation, node)
@@ -300,10 +300,10 @@ class FlowGraphBuilder(HasTraits):
         port_names = []
         return_value = event.value
         if event.nvalues > 1:
-            port_names.extend([ '__return__.%i' % i
+            port_names.extend([ 'return.%i' % i
                                 for i in range(len(return_value)) ])
         elif return_value is not None:
-            port_names.append('__return__')
+            port_names.append('return')
         for arg_name in event.arguments.keys():
             if not self.is_pure(event, annotation, arg_name):
                 port_names.append((arg_name, self._mutated_port_name(arg_name)))
@@ -467,7 +467,7 @@ class FlowGraphBuilder(HasTraits):
                         portkind='input',
                         annotation_index=1,
                     )),
-                    ('__return__', self._get_port_data(event, slot_value,
+                    ('return', self._get_port_data(event, slot_value,
                         portkind='output',
                         annotation_index=1,
                     )),
@@ -481,7 +481,7 @@ class FlowGraphBuilder(HasTraits):
             slot_id = self.object_tracker.maybe_track(slot_value)
             if slot_id:
                 self._set_object_output_node(
-                    event, slot_value, slot_id, slot_node, '__return__')
+                    event, slot_value, slot_id, slot_node, 'return')
     
     def _get_ports_data(self, event, names, annotation=[], extra_data={}):
         """ Get data for the ports (input or output) of a node.
@@ -625,7 +625,7 @@ class _IOSlots(object):
     
     def __getattr__(self, name):
         event = self.__event
-        if name == '__return__':
+        if name == 'return':
             return event.value
         try:
             return event.arguments[name]

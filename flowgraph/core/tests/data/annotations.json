@@ -92,7 +92,7 @@
     "inputs": [],
     "outputs": [
       {
-        "slot": "__return__",
+        "slot": "return",
         "name": "foo"
       }
     ]
@@ -108,7 +108,7 @@
     "inputs": [],
     "outputs": [
       {
-        "slot": "__return__",
+        "slot": "return",
         "name": "empty"
       }
     ]
@@ -135,7 +135,7 @@
     ],
     "outputs": [
       {
-        "slot": "__return__",
+        "slot": "return",
         "name": "bar"
       }
     ],
@@ -161,7 +161,7 @@
         "name": "foo"
       },
       {
-        "slot": "__return__",
+        "slot": "return",
         "name": "bar"
       }
     ],
@@ -184,7 +184,7 @@
     ],
     "outputs": [
       {
-        "slot": "__return__",
+        "slot": "return",
         "name": "sum"
       }
     ]
@@ -206,7 +206,7 @@
     ],
     "outputs": [
       {
-        "slot": "__return__",
+        "slot": "return",
         "name": "prod"
       }
     ]
@@ -228,7 +228,7 @@
     ],
     "outputs": [
       {
-        "slot": "__return__",
+        "slot": "return",
         "name": "prod"
       }
     ]
