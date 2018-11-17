@@ -162,9 +162,26 @@ class Tracer(ASTTracer):
         """ Called after function returns.
         """
         scope = self._stack.pop()
+
+        # If we detect a compound assignment, coerce the return value to a
+        # tuple. This is rather tricky. The change will not affect the semantics
+        # of the program, but it will prevent the return sub-values from being
+        # garbage collected unexpectedly when they are ephemeral objects, like
+        # slices of a NumPy array.
+        if nvalues > 1:
+            try:
+                return_value = tuple(return_value)
+            except TypeError:
+                # This will only fail when the return value is not iterable,
+                # in which case the user has an error in their code that will
+                # be raised shortly.
+                pass
+
+        # Create return event.
         event = self._create_return_event(scope.event, return_value, nvalues)
         if scope.emit_events:
             self.event = event
+
         return event
     
     def _trace_access(self, name, value):

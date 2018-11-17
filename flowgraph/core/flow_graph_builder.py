@@ -364,9 +364,9 @@ class FlowGraphBuilder(HasTraits):
 
         # Get source node and port corresponding to argument, if possible.
         arg_event = event.argument_events.get(arg_name)
-        if arg_id:
+        if arg_id and arg_id in context.output_table:
             # First, check if argument object is tracked.
-            src, src_port = self._get_object_output_node(arg_id)
+            src, src_port = context.output_table[arg_id]
         elif arg_event and arg_event in context.event_table:
             # If that fails, fall back to static analysis, via the event table.
             src, src_port = context.event_table[arg_event]
@@ -409,18 +409,11 @@ class FlowGraphBuilder(HasTraits):
         self._add_object_edge(obj, input_node, node, obj_id=obj_id,
                               targetport=port)
     
-    def _get_object_output_node(self, obj_id):
-        """ Get the node/port of which the object is an output, if any. 
-        
-        An object is an "output" of a call node if it is the last node to have
-        created/mutated the object.
-        """
-        context = self._stack[-1]
-        output_table = context.output_table
-        return output_table.get(obj_id, (None, None))
-    
     def _set_object_output_node(self, event, obj, obj_id, node, port):
         """ Set an object as an output of a node.
+
+        An object is an "output" of a call node if it is the last node to have
+        created/mutated the object.
         """
         context = self._stack[-1]
         graph, output_table = context.graph, context.output_table
