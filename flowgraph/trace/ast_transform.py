@@ -257,6 +257,7 @@ class ContainerLiteralsToFunctions(ast.NodeTransformer):
     def visit_List(self, node):
         """ Convert list literal to function call.
         """
+        self.generic_visit(node)
         if isinstance(node.ctx, ast.Load):
             return to_call(to_attribute(self.operator, '__list__'), node.elts)
         return node
@@ -264,6 +265,7 @@ class ContainerLiteralsToFunctions(ast.NodeTransformer):
     def visit_Tuple(self, node):
         """ Convert tuple literal to function call.
         """
+        self.generic_visit(node)
         if isinstance(node.ctx, ast.Load):
             return to_call(to_attribute(self.operator, '__tuple__'), node.elts)
         return node
@@ -271,11 +273,13 @@ class ContainerLiteralsToFunctions(ast.NodeTransformer):
     def visit_Set(self, node):
         """ Convert set literal to function call.
         """
+        self.generic_visit(node)
         return to_call(to_attribute(self.operator, '__set__'), node.elts)
     
     def visit_Dict(self, node):
         """ Convert dictionary literal to function call, if possible.
         """
+        self.generic_visit(node)
         if all(isinstance(key, ast.Str) for key in node.keys):
             keywords = [ ast.keyword(arg=key.s, value=value)
                          for key, value in zip(node.keys, node.values) ]

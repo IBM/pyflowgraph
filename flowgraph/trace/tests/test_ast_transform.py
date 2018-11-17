@@ -238,6 +238,14 @@ class TestASTTransform(unittest.TestCase):
         ContainerLiteralsToFunctions().visit(node)
         result = 'dict(x=1, y=2)'
         self.assertEqual(to_source(node).strip(), result)
+    
+    def test_compound_sequence_literal(self):
+        """ Can we replace a compound sequence literal with function calls?
+        """
+        node = ast.parse("[ ('x',0), ('y',1) ]")
+        ContainerLiteralsToFunctions('op').visit(node)
+        result = "op.__list__(op.__tuple__('x', 0), op.__tuple__('y', 1))"
+        self.assertEqual(to_source(node).strip(), result)
 
 
 if __name__ == '__main__':
