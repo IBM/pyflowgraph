@@ -18,7 +18,7 @@ from __future__ import absolute_import
 
 import ast
 import sys
-from .ast_transform import to_attribute, to_call, to_name, to_name_constant, \
+from .ast_util import to_attribute, to_call, to_name, to_name_constant, \
     to_list, to_tuple
 
 from traitlets import HasTraits, Any
