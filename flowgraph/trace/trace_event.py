@@ -16,7 +16,7 @@ from __future__ import absolute_import
 
 from collections import OrderedDict
 
-from traitlets import HasTraits, Any, Bool, Dict, Instance, Int, List, Unicode
+from traitlets import HasTraits, Any, Bool, Dict, Instance, List, Unicode
 
 from .ast_tracer import BoxedValue
 
@@ -93,19 +93,19 @@ class TraceReturn(TraceFunctionEvent, TraceValueEvent):
     # corresponding call event.
     arguments = Instance(OrderedDict)
 
-    # Number of return values, according to syntactic context.
+    # Whether there are multiple return values, according to syntactic context.
     #
-    # Like many programming languages, Python treats function inputs and outputs
-    # asymmetrically. A function can have many arguments, but only one return
-    # value. By convention, multiple return values are represented by returning
-    # a tuple or another sequence type. Because this is a matter of convention,
-    # any attempt to determine the "true"  or "logical" number of return values
-    # must be heuristic.
+    # Like many programming languages, Python treats function inputs and
+    # outputs asymmetrically. A function may have many arguments, but only one
+    # return value. By convention, multiple return values are represented by
+    # returning a tuple or another sequence type. But this is a matter of
+    # convention only, so any attempt to determine the "true"  or "logical"
+    # number of return values is heuristic.
     #
     # In an ordinary assignment, `x = f()`, or function composition, `g(f())`,
-    # this number will be 1, but in a compound assignment, `x, y = f()`, it will
-    # be greater than 1.
-    nvalues = Int(1)
+    # this flag with be True, but in a compound assignment, like `x, y = f()`,
+    # it will be False.
+    multiple_values = Bool(False)
 
 
 class TraceAccess(TraceValueEvent):

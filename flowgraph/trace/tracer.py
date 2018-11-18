@@ -158,7 +158,7 @@ class Tracer(ASTTracer):
         scope = _ScopeItem(event=event, emit_events=emit_events)
         self._stack.append(scope)
     
-    def _trace_return(self, return_value, nvalues):
+    def _trace_return(self, return_value, multiple_values=False):
         """ Called after function returns.
         """
         scope = self._stack.pop()
@@ -168,7 +168,7 @@ class Tracer(ASTTracer):
         # of the program, but it will prevent the return sub-values from being
         # garbage collected unexpectedly when they are ephemeral objects, like
         # slices of a NumPy array.
-        if nvalues > 1:
+        if multiple_values:
             try:
                 return_value = tuple(return_value)
             except TypeError:
@@ -178,7 +178,8 @@ class Tracer(ASTTracer):
                 pass
 
         # Create return event.
-        event = self._create_return_event(scope.event, return_value, nvalues)
+        event = self._create_return_event(
+            scope.event, return_value, multiple_values)
         if scope.emit_events:
             self.event = event
 
@@ -271,14 +272,14 @@ class Tracer(ASTTracer):
                          module_name=module_name, qual_name=qual_name,
                          arguments=arguments, argument_events=argument_events)
     
-    def _create_return_event(self, call_event, return_value, nvalues):
+    def _create_return_event(self, call_event, return_value, multiple_values):
         """ Create trace event for function return.
         """
         call = call_event
         return TraceReturn(tracer=self, function=call.function,
                            atomic=call.atomic, module_name=call.module_name,
                            qual_name=call.qual_name, arguments=call.arguments, 
-                           value=return_value, nvalues=nvalues)
+                           value=return_value, multiple_values=multiple_values)
 
 
 class _ScopeItem(HasTraits):

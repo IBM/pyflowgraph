@@ -18,7 +18,8 @@ from __future__ import absolute_import
 
 import ast
 import sys
-from .ast_transform import to_attribute, to_call, to_name, to_list, to_tuple
+from .ast_transform import to_attribute, to_call, to_name, to_name_constant, \
+    to_list, to_tuple
 
 from traitlets import HasTraits, Any
 
@@ -44,10 +45,10 @@ class ASTTracer(HasTraits):
         """
         return self._unbox(self._trace_argument(arg_value, arg_name, nstars))
 
-    def trace_return(self, return_value, nvalues=1):
+    def trace_return(self, return_value, multiple_values=False):
         """ Called after function returns.
         """
-        return self._unbox(self._trace_return(return_value, nvalues))
+        return self._unbox(self._trace_return(return_value, multiple_values))
     
     def trace_access(self, name, value):
         """ Called after a variable is accessed.
@@ -78,7 +79,7 @@ class ASTTracer(HasTraits):
         """
         return arg_value
     
-    def _trace_return(self, return_value, nvalues=1):
+    def _trace_return(self, return_value, multiple_values=False):
         """ Called after function returns.
 
         May be reimplemented in subclasss.
@@ -163,7 +164,7 @@ class ASTTraceTransformer(ast.NodeTransformer):
             ...(x=trace_argument(_trace_return(...), 'x'))
         """
         boxed = self._state.get('boxed', False)
-        nvalues = self._state.get('nvalues', 1)
+        multiple_values = self._state.get('multiple_values', False)
         func = self.visit(call.func)
 
         # Visit positional and keyword arguments.
@@ -191,7 +192,7 @@ class ASTTraceTransformer(ast.NodeTransformer):
                 ]),
                 args, keywords, starargs, kwargs
             ),
-            ast.Num(nvalues),
+            to_name_constant(multiple_values),
         ])
     
     def visit_argument(self, arg_value, arg_name=None, nstars=0):
@@ -245,14 +246,15 @@ class ASTTraceTransformer(ast.NodeTransformer):
         """
         targets_literal = to_list(map(self.target_to_literal, node.targets))
 
-        # Determine number of values in a compound assignment like `x,y = ...`.
-        # FIXME: What about a case like `z = x,y = ...`? We're taking the max.
+        # Is this a compound assignment, e.g. `x,y = ...` or, for our purposes,
+        # even `z = x,y = ...`?
         targets = ast.literal_eval(targets_literal)
-        nvalues = max(1 if isinstance(t, str) else len(t) for t in targets)
+        multiple_values = any(not isinstance(t, str) for t in targets)
 
         node.value = to_call(self.tracer_method('trace_assign'), [
             targets_literal,
-            self.visit_with_state(node.value, boxed=True, nvalues=nvalues),
+            self.visit_with_state(node.value,
+                boxed=True, multiple_values=multiple_values),
         ])
         return node
     

@@ -197,7 +197,7 @@ class FlowGraphBuilder(HasTraits):
             return
         
         # Set output for return value(s).
-        if event.nvalues > 1:
+        if event.multiple_values:
             # Interpret tuples as multiple return values, per Python convention.
             for i, value in enumerate(return_value):
                 value_id = self.object_tracker.maybe_track(value)
@@ -299,7 +299,7 @@ class FlowGraphBuilder(HasTraits):
         # Add output ports.
         port_names = []
         return_value = event.value
-        if event.nvalues > 1:
+        if event.multiple_values:
             port_names.extend([ 'return.%i' % i
                                 for i in range(len(return_value)) ])
         elif return_value is not None:
