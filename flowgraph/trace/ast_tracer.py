@@ -18,8 +18,8 @@ from __future__ import absolute_import
 
 import ast
 import sys
-from .ast_util import to_attribute, to_call, to_name, to_name_constant, \
-    to_list, to_tuple
+from .ast_util import get_single_target, to_attribute, to_call, to_name, \
+    to_name_constant, to_list, to_tuple
 
 from traitlets import HasTraits, Any
 
@@ -55,15 +55,15 @@ class ASTTracer(HasTraits):
         """
         return self._unbox(self._trace_access(name, value))
     
-    def trace_assign(self, names, value):
+    def trace_assign(self, name, value):
         """ Called before a variable is assigned.
         """
-        return self._unbox(self._trace_assign(names, value))
+        return self._unbox(self._trace_assign(name, value))
     
-    def trace_delete(self, names):
+    def trace_delete(self, name):
         """ Called before a variable is deleted.
         """
-        return self._trace_delete(names)
+        return self._trace_delete(name)
     
     def _trace_function(self, function, args):
         """ Called after function object is evaluated.
@@ -93,14 +93,14 @@ class ASTTracer(HasTraits):
         """
         return value
     
-    def _trace_assign(self, names, value):
+    def _trace_assign(self, name, value):
         """ Called before a variable is assigned.
 
         May be reimplemented in subclass.
         """
         return value
     
-    def _trace_delete(self, names):
+    def _trace_delete(self, name):
         """ Called before a variable is deleted.
 
         May be reimplemented in subclass.
@@ -238,23 +238,18 @@ class ASTTraceTransformer(ast.NodeTransformer):
 
         Replaces variable assignments, e.g.
 
-            x = y = 1
+            x, y = f()
         
         with wrapped assignments, e.g.
 
-            x = y = trace_assign(['x','y'], 1)
+            x, y = trace_assign(('x','y'), f())
         """
-        targets_literal = to_list(map(self.target_to_literal, node.targets))
-
-        # Is this a compound assignment, e.g. `x,y = ...` or, for our purposes,
-        # even `z = x,y = ...`?
-        targets = ast.literal_eval(targets_literal)
-        multiple_values = any(not isinstance(t, str) for t in targets)
-
+        target = get_single_target(node)
+        is_compound = not isinstance(target, ast.Name)
         node.value = to_call(self.tracer_method('trace_assign'), [
-            targets_literal,
+            self.target_to_literal(target),
             self.visit_with_state(node.value,
-                boxed=True, multiple_values=multiple_values),
+                boxed=True, multiple_values=is_compound),
         ])
         return node
     
@@ -273,22 +268,19 @@ class ASTTraceTransformer(ast.NodeTransformer):
     def visit_Delete(self, node):
         """ Rewrite AST Delete node with tracing.
 
-        Replaces variable deletions, e.g.
+        Replaces variable deletions, e.g., replaces `del x` with
 
-            del x, y
-        
-        with
-
-            trace_delete(['x','y'])
-            del x, y
+            trace_delete('x')
+            del x
         """
-        self.generic_visit(node)
-        names = [ n.id for n in node.targets if isinstance(n, ast.Name) ]
-        names_node = to_list(ast.Str(name) for name in names)
-        return [
-            ast.Expr(to_call(self.tracer_method('trace_delete'), [names_node])),
-            node,
-        ]
+        target = get_single_target(node)
+        if isinstance(target, ast.Name):
+            args = [ ast.Str(target.id) ]
+            return [
+                ast.Expr(to_call(self.tracer_method('trace_delete'), args)),
+                node,
+            ]
+        return node
 
 
 class BoxedValue(HasTraits):

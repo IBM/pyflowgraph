@@ -22,8 +22,8 @@ import types
 from traitlets import HasTraits, Any, Bool, Instance, Int, List
 
 from .ast_tracer import ASTTracer, ASTTraceTransformer
-from .ast_transform import AttributesToFunctions, IndexingToFunctions, \
-    InplaceOperatorsToFunctions, OperatorsToFunctions, \
+from .ast_transform import EliminateMultipleTargets, AttributesToFunctions, \
+    IndexingToFunctions, InplaceOperatorsToFunctions, OperatorsToFunctions, \
     ContainerLiteralsToFunctions
 from .inspect_function import bind_arguments
 from .inspect_name import get_func_module_name, get_func_qual_name
@@ -197,7 +197,7 @@ class Tracer(ASTTracer):
         
         return value
     
-    def _trace_assign(self, names, value):
+    def _trace_assign(self, name, value):
         """ Called before a variable is assigned.
         """
         scope = self._stack[-1]
@@ -211,17 +211,17 @@ class Tracer(ASTTracer):
         # Create assign event.
         if scope.emit_events:
             self.event = event = TraceAssign(
-                names=names, value=value, value_event=value_event)
+                name=name, value=value, value_event=value_event)
             return event
         
         return value
     
-    def _trace_delete(self, names):
+    def _trace_delete(self, name):
         """ Called before a variable is deleted.
         """
         scope = self._stack[-1]
         if scope.emit_events:
-            self.event = TraceDelete(names=names)
+            self.event = TraceDelete(name=name)
     
     # Protected interface
 
@@ -241,6 +241,7 @@ class Tracer(ASTTracer):
         """
         operator_name = '__operator__'
         transformers = [
+            EliminateMultipleTargets(),
             AttributesToFunctions(),
             IndexingToFunctions(operator_name),
             OperatorsToFunctions(operator_name),

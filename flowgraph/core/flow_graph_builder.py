@@ -16,6 +16,7 @@ from __future__ import absolute_import
 
 from collections import deque, OrderedDict
 from copy import deepcopy
+import six
 import types
 from weakref import WeakKeyDictionary
 
@@ -237,24 +238,40 @@ class FlowGraphBuilder(HasTraits):
         """ Update variable table for variable assign event.
         """
         context = self._stack[-1]
-        obj = event.value
-        obj_id = self.object_tracker.get_id(obj)
-        source = None
-        if obj_id:
-            source = context.output_table[obj_id]
-        elif event.value_event:
-            source = context.event_table.get(event.value_event)
-        
-        if source is not None:
-            for name in event.names:
-                context.variable_table[name] = source
+        value, value_event = event.value, event.value_event
+
+        if isinstance(event.name, six.string_types):
+            # Case 1: simple assignment.
+            value_id = self.object_tracker.get_id(value)
+            if value_id and value_id in context.output_table:
+                source = context.output_table[value_id]
+            elif value_event and value_event in context.event_table:
+                source = context.event_table[value_event]
+            else:
+                source = None
+            if source is not None:
+                context.variable_table[event.name] = source
+
+        else:
+            # Case 2: compound assignment.
+            for i, name in enumerate(event.name):
+                value_id = self.object_tracker.get_id(value[i])
+                if value_id and value_id in context.output_table:
+                    source = context.output_table[value_id]
+                elif value_event and value_event in context.event_table:
+                    src, src_port = context.event_table[value_event]
+                    source = (src, src_port + '.' + str(i))
+                else:
+                    source = None
+                if source is not None:
+                    context.variable_table[name] = source
+
     
     def _push_delete_event(self, event):
-        """ Clean variable table in response to variable deletion event.
+        """ Clean variable table in response to a variable deletion event.
         """
         context = self._stack[-1]
-        for name in event.names:
-            context.variable_table.pop(name, None)
+        context.variable_table.pop(event.name, None)
         
     def _add_call_node(self, event, annotation):
         """ Add a new call node for a call event.

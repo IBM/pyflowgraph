@@ -23,8 +23,69 @@ from __future__ import absolute_import
 import ast
 import six
 
-from .ast_util import to_attribute, to_call, to_name, to_name_constant, \
-    to_list, to_tuple, set_ctx
+from .ast_util import gensym, get_single_target, set_ctx, \
+    to_attribute, to_call, to_name, to_name_constant, to_list, to_tuple
+
+
+class EliminateMultipleTargets(ast.NodeTransformer):
+    """ Eliminate statements with multiple targets.
+
+    Converts an assignment or deletion statement with multiple targets to a
+    sequences of statements with single targets.
+    """
+
+    def visit_Assign(self, node):
+        """ Replace multiple assignment with single assignments.
+        """
+        self.generic_visit(node)
+        if len(node.targets) <= 1:
+            return node
+
+        # Case 1: at least one compound assignment.
+        if any(not isinstance(target, ast.Name) for target in node.targets):
+            # Determine number of values (arity) of compound assignment.
+            nvalues = { len(target.elts) for target in node.targets 
+                        if not isinstance(target, ast.Name) }
+            if len(nvalues) > 1:
+                # A multiple, compound assignment with different arities, e.g.
+                # `x,y = a,b,c = ...` is not a syntax error in Python, though
+                # it probably should be because it's guaranteed to cause a
+                # runtime error. Raise the error here, since we cannot proceed.
+                raise SyntaxError("Multiple assignment with different arities")
+            nvalues = nvalues.pop()
+
+            # Rewrite assignment as sequence of assignments.
+            temps = [ gensym() for i in range(nvalues) ]
+            temp_target = to_tuple(
+                (to_name(temp, ast.Store()) for temp in temps), ast.Store())
+            stmts = [ ast.Assign([temp_target], node.value) ]
+            for target in reversed(node.targets):
+                if isinstance(target, ast.Name):
+                    temp_tuple = to_tuple(to_name(temp) for temp in temps)
+                    stmts += [ ast.Assign([target], temp_tuple) ]
+                else:
+                    stmts += [ ast.Assign([target.elts[i]], to_name(temps[i]))
+                               for i in range(nvalues) ]
+        
+        # Case 2: no compound assignments.
+        else:
+            temp = gensym()
+            temp_target = to_name(temp, ast.Store())
+            stmts = [ ast.Assign([temp_target], node.value) ]
+            stmts += [ ast.Assign([target], to_name(temp))
+                       for target in node.targets ]
+        
+        return stmts
+
+
+    def visit_Delete(self, node):
+        """ Replace multiple deletion with single deletions.
+        """
+        self.generic_visit(node)
+        if len(node.targets) <= 1:
+            return node
+
+        return [ ast.Delete([node.target]) for target in node.targets ]
 
 
 class AttributesToFunctions(ast.NodeTransformer):
@@ -46,10 +107,7 @@ class AttributesToFunctions(ast.NodeTransformer):
         """ Convert assignment to attributes to `setattr` call.
         """
         self.generic_visit(node)
-        if len(node.targets) > 1:
-            raise NotImplementedError("Multiple assignment not implemented")
-        
-        target = node.targets[0]
+        target = get_single_target(node)
         if isinstance(target, ast.Attribute):
             args = [ target.value, ast.Str(target.attr), node.value ]
             return ast.Expr(to_call(to_name('setattr'), args))
@@ -59,14 +117,11 @@ class AttributesToFunctions(ast.NodeTransformer):
         """ Convert `del` on attributes to `delattr` call.
         """
         self.generic_visit(node)
-        stmts = []
-        for target in node.targets:
-            if isinstance(target, ast.Attribute):
-                args = [ target.value, ast.Str(target.attr) ]
-                stmts.append(ast.Expr(to_call(to_name('delattr'), args)))
-            else:
-                stmts.append(ast.Delete([target]))
-        return stmts
+        target = get_single_target(node)
+        if isinstance(target, ast.Attribute):
+            args = [ target.value, ast.Str(target.attr) ]
+            return ast.Expr(to_call(to_name('delattr'), args))
+        return node
 
 
 class IndexingToFunctions(ast.NodeTransformer):
@@ -113,10 +168,7 @@ class IndexingToFunctions(ast.NodeTransformer):
         """ Convert indexed assignment to `setitem` call.
         """
         self.generic_visit(node)
-        if len(node.targets) > 1:
-            raise NotImplementedError("Multiple assignment not implemented")
-        
-        target = node.targets[0]
+        target = get_single_target(node)
         if isinstance(target, ast.Subscript):
             fun = to_attribute(self.operator, 'setitem')
             args = [target.value, self.index_to_expr(target.slice), node.value]
@@ -127,15 +179,12 @@ class IndexingToFunctions(ast.NodeTransformer):
         """ Convert indexed `del` operation to `delitem` call.
         """
         self.generic_visit(node)
-        stmts = []
-        for target in node.targets:
-            if isinstance(target, ast.Subscript):
-                fun = to_attribute(self.operator, 'delitem')
-                args = [ target.value, self.index_to_expr(target.slice) ]
-                stmts.append(ast.Expr(to_call(fun, args)))
-            else:
-                stmts.append(ast.Delete([target]))
-        return stmts
+        target = get_single_target(node)
+        if isinstance(target, ast.Subscript):
+            fun = to_attribute(self.operator, 'delitem')
+            args = [ target.value, self.index_to_expr(target.slice) ]
+            return ast.Expr(to_call(fun, args))
+        return node
     
     def visit_AugAssign(self, node):
         """ Convert indexed augmented assignment to `getitem`/`setitem` calls.
@@ -229,7 +278,7 @@ class OperatorsToFunctions(ast.NodeTransformer):
         """
         self.generic_visit(node)
         if len(node.ops) > 1:
-            raise NotImplementedError("Multiple comparisons not implemented")
+            raise NotImplementedError("Multiple comparisons not supported")
 
         op, comparator = node.ops[0], node.comparators[0]
         if isinstance(op, ast.In):

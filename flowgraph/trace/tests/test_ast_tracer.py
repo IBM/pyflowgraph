@@ -181,22 +181,9 @@ class TestASTTracer(unittest.TestCase):
 
         env = self.exec_ast(node)
         self.assertEqual(self.var_history, [
-            ('write', ['x'], 1),
+            ('write', 'x', 1),
         ])
         self.assertEqual(env['x'], 1)
-    
-    def test_trace_var_multiple_assign(self):
-        """ Can we trace a multiple variable assignment?
-        """
-        node = ast.parse('x = y = 1')
-        ASTTraceTransformer('__trace__').visit(node)
-
-        env = self.exec_ast(node)
-        self.assertEqual(self.var_history, [
-            ('write', ['x','y'], 1),
-        ])
-        self.assertEqual(env['x'], 1)
-        self.assertEqual(env['y'], 1)
     
     def test_trace_var_compound_assign(self):
         """ Can we trace a compound variable assignment?
@@ -206,7 +193,7 @@ class TestASTTracer(unittest.TestCase):
 
         env = self.exec_ast(node)
         self.assertEqual(self.var_history, [
-            ('write', [('x','y')], (0,1)),
+            ('write', ('x','y'), (0,1)),
         ])
         self.assertEqual(env['x'], 0)
         self.assertEqual(env['y'], 1)
@@ -219,22 +206,9 @@ class TestASTTracer(unittest.TestCase):
         
         env = self.exec_ast(node, env={'x': 1})
         self.assertEqual(self.var_history, [
-            ('delete', ['x'])
+            ('delete', 'x'),
         ])
         self.assertNotIn('x', env)
-    
-    def test_trace_var_multiple_delete(self):
-        """ Can we trace a multiple variable deletion?
-        """
-        node = ast.parse('del x, y')
-        ASTTraceTransformer('__trace__').visit(node)
-        
-        env = self.exec_ast(node, env={'x': 0, 'y': 1})
-        self.assertEqual(self.var_history, [
-            ('delete', ['x','y'])
-        ])
-        self.assertNotIn('x', env)
-        self.assertNotIn('y', env)
 
 
 class LoggingASTTracer(ASTTracer):
@@ -261,12 +235,12 @@ class LoggingASTTracer(ASTTracer):
         self.var_history.append(('read', name, value))
         return value
     
-    def _trace_assign(self, names, value):
-        self.var_history.append(('write', names, value))
+    def _trace_assign(self, name, value):
+        self.var_history.append(('write', name, value))
         return value
 
-    def _trace_delete(self, names):
-        self.var_history.append(('delete', names))
+    def _trace_delete(self, name):
+        self.var_history.append(('delete', name))
 
 
 if __name__ == '__main__':

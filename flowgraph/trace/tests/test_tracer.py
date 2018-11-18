@@ -230,7 +230,7 @@ class TestTracer(unittest.TestCase):
         self.assertEqual(len(events), 1)
         event = events[0]
         self.assertIsInstance(event, TraceAssign)
-        self.assertEqual(event.names, ['x'])
+        self.assertEqual(event.name, 'x')
         self.assertEqual(event.value, 1)
     
     def test_variable_assign_boxed_return(self):
@@ -240,7 +240,7 @@ class TestTracer(unittest.TestCase):
 
         events = self.variable_events
         event = next(evt for evt in events if isinstance(evt, TraceAssign))
-        self.assertEqual(event.names, ['foo'])
+        self.assertEqual(event.name, 'foo')
         self.assertEqual(event.value, env['foo'])
         self.assertIsInstance(event.value_event, TraceReturn)
         self.assertEqual(event.value_event.function, objects.Foo)
@@ -253,7 +253,7 @@ class TestTracer(unittest.TestCase):
 
         events = self.variable_events
         event = next(evt for evt in events if isinstance(evt, TraceAssign))
-        self.assertEqual(event.names, [('foo','bar')])
+        self.assertEqual(event.name, ('foo','bar'))
         self.assertEqual(event.value, (env['foo'],env['bar']))
         self.assertIsInstance(event.value_event, TraceReturn)
         self.assertEqual(event.value_event.function, objects.create_foo_and_bar)
@@ -279,8 +279,7 @@ class TestTracer(unittest.TestCase):
         self.assertEqual(len(events), 1)
         event = events[0]
         self.assertIsInstance(event, TraceDelete)
-        self.assertEqual(event.names, ['x'])
-        
+        self.assertEqual(event.name, 'x')
 
 
 if __name__ == '__main__':

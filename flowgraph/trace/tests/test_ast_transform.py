@@ -21,11 +21,63 @@ import unittest
 from astor import to_source
 
 from ..ast_transform import *
+from ..ast_util import gensym
 
 
 class TestASTTransform(unittest.TestCase):
     """ Test cases for abstract syntax tree (AST) transformers.
     """
+
+    def test_single_assign(self):
+        """ Check that single assignments are preserved exactly?
+        """
+        node = ast.parse('x = 1')
+        EliminateMultipleTargets().visit(node)
+        self.assertEqual(to_source(node).strip(), 'x = 1')
+
+        node = ast.parse('x, y = z')
+        EliminateMultipleTargets().visit(node)
+        self.assertEqual(to_source(node).strip(), 'x, y = z')
+
+    def test_multiple_assign_simple(self):
+        """ Can we eliminate a simple multiple assignment?
+        """
+        node = ast.parse('x = y = f()')
+        EliminateMultipleTargets().visit(node)
+        gensym.reset()
+        self.assertEqual(to_source(node), dedent("""\
+            __gensym_1 = f()
+            x = __gensym_1
+            y = __gensym_1
+        """))
+    
+    def test_multiple_assign_compound(self):
+        """ Can we eliminate a compound multiple assignment?
+        """
+        node = ast.parse('a, b = x, y = f()')
+        EliminateMultipleTargets().visit(node)
+        gensym.reset()
+        self.assertEqual(to_source(node), dedent("""\
+            __gensym_1, __gensym_2 = f()
+            x = __gensym_1
+            y = __gensym_2
+            a = __gensym_1
+            b = __gensym_2
+        """))
+    
+    def test_multiple_assign_simple_and_compound(self):
+        """ Can we eliminate a multiple assignment involing both simple and
+        compound targets?
+        """
+        node = ast.parse('z = x, y = f()')
+        EliminateMultipleTargets().visit(node)
+        gensym.reset()
+        self.assertEqual(to_source(node), dedent("""\
+            __gensym_1, __gensym_2 = f()
+            x = __gensym_1
+            y = __gensym_2
+            z = __gensym_1, __gensym_2
+        """))
     
     def test_simple_getattr(self):
         """ Can we replace a simple attribute access with `getattr`?
@@ -72,24 +124,13 @@ class TestASTTransform(unittest.TestCase):
             setattr(getattr(container, 'foo'), 'x', 10)
         """))
     
-    def test_simple_delattr(self):
-        """ Can we replace a simple attribute deletion with `delattr`?
+    def test_delattr(self):
+        """ Can we replace an attribute deletion with `delattr`?
         """
         node = ast.parse('del foo.x')
         AttributesToFunctions().visit(node)
         self.assertEqual(to_source(node), dedent("""\
             delattr(foo, 'x')
-        """))
-    
-    def test_multiple_delattr(self):
-        """ Can we replace a multiple deletion of attributes with `delattr`s?
-        """
-        node = ast.parse('del foo.x, other, foo.y')
-        AttributesToFunctions().visit(node)
-        self.assertEqual(to_source(node), dedent("""\
-            delattr(foo, 'x')
-            del other
-            delattr(foo, 'y')
         """))
     
     def test_unary_op(self):

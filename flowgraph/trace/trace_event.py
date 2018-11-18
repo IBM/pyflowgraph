@@ -16,7 +16,7 @@ from __future__ import absolute_import
 
 from collections import OrderedDict
 
-from traitlets import HasTraits, Any, Bool, Dict, Instance, List, Unicode
+from traitlets import HasTraits, Any, Bool, Dict, Instance, Unicode
 
 from .ast_tracer import BoxedValue
 
@@ -124,8 +124,10 @@ class TraceAssign(TraceValueEvent):
     The value to be assigned is stored in the `value` attribute.
     """
 
-    # Names of variables to be assigned.
-    names = List()
+    # Name(s) of variables to be assigned.
+    # XXX: Should be `Union((Unicode(), List(), Tuple()))`, but that trait
+    # implicitly coerces tuples to lists.
+    name = Any()
 
     # Parent event of value, if any.
     value_event = Instance(TraceValueEvent, allow_none=True)
@@ -135,8 +137,8 @@ class TraceDelete(TraceEvent):
     """ Event generated immediately before a variable is deleted.
     """
 
-    # Names of variables to be deleted.
-    names = List()
+    # Names of variable to be deleted.
+    name = Unicode()
 
 
 # XXX: Trait change notifications for `return_value` can lead to FutureWarning

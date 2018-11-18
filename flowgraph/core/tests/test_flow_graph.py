@@ -423,6 +423,29 @@ class TestFlowGraph(unittest.TestCase):
         target.add_edge('new_foo', outputs, sourceport='return')
         self.assert_isomorphic(actual, target, check_id=False)
     
+    def test_primitive_compound_assignment(self):
+        """ Test a compound assignment of primitive values.
+        """
+        actual = self.record("""
+            x = [1, 2, 3, 4, 5]
+            m, M = min(x), max(x)
+            m + M
+        """)
+
+        target = new_flow_graph()
+        target.add_node('list', qual_name='__list__')
+        target.add_node('min', qual_name='min')
+        target.add_node('max', qual_name='max')
+        target.add_node('tuple', qual_name='__tuple__')
+        target.add_node('add', qual_name='add')
+        target.add_edge('list', 'min', sourceport='return', targetport='0')
+        target.add_edge('list', 'max', sourceport='return', targetport='0')
+        target.add_edge('min', 'tuple', sourceport='return', targetport='0')
+        target.add_edge('max', 'tuple', sourceport='return', targetport='1')
+        target.add_edge('tuple', 'add', sourceport='return.0', targetport='0')
+        target.add_edge('tuple', 'add', sourceport='return.1', targetport='1')
+        self.assert_isomorphic(actual, target)
+    
     def test_track_inside_list(self):
         """ Test a function call with tracked objects inside a list.
         """

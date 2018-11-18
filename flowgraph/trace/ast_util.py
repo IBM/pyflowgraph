@@ -20,9 +20,32 @@ import ast
 import copy
 import six
 import sys
+from threading import Lock
 
 
-# Convenience functions for creating AST nodes
+class Gensym(object):
+    """ Generator of unique names ("symbols") ala LISP.
+    """
+
+    def __init__(self):
+        self.counter = 0
+        self.lock = Lock()
+
+    def __call__(self, prefix='__gensym_'):
+        with self.lock:
+            self.counter += 1
+            return prefix + str(self.counter)
+    
+    def reset(self):
+        with self.lock:
+            self.counter = 0
+
+""" Generate unique names ("symbols") ala LISP.
+"""
+gensym = Gensym()
+
+
+# Creating and casting to AST nodes
 
 def to_call(func, args=[], keywords=[], starargs=None, kwargs=None):
     """ Create a Call AST node.
@@ -68,6 +91,18 @@ def to_tuple(elts, ctx=None):
     """ Create a Tuple AST node.
     """
     return ast.Tuple(list(elts), ctx or ast.Load())
+
+
+# Miscellaneous
+
+def get_single_target(node):
+    """ Check that AST node has single target and return it.
+    """
+    if len(node.targets) > 1:
+        raise NotImplementedError(
+            "Multiple targets in assignment or deletion not supported")
+
+    return node.targets[0]
 
 def set_ctx(node, ctx=None):
     """ Replace AST context without mutation.
