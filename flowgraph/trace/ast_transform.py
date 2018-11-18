@@ -26,66 +26,90 @@ import six
 from .ast_util import gensym, get_single_target, set_ctx, \
     to_attribute, to_call, to_name, to_name_constant, to_list, to_tuple
 
+is_sequence_node = lambda node: isinstance(node, (ast.List, ast.Tuple))
+
 
 class EliminateMultipleTargets(ast.NodeTransformer):
     """ Eliminate statements with multiple targets.
 
-    Converts an assignment or deletion statement with multiple targets to a
-    sequences of statements with single targets.
+    Converts any assignment or deletion statement with multiple targets to a
+    sequences of statements which each have a single target. We are careful
+    to preserve Python's evaluation order:
+    https://docs.python.org/3/reference/expressions.html#evaluation-order
+
+    This normalization is a pre-processing step. All other AST transformers in
+    this module assume that assignments and deletions have multiplicity 1.
     """
 
     def visit_Assign(self, node):
         """ Replace multiple assignment with single assignments.
         """
         self.generic_visit(node)
-        if len(node.targets) <= 1:
-            return node
+        is_multiple = len(node.targets) > 1
+        is_compound = any(map(is_sequence_node, node.targets))
+        is_simple = not is_compound
+        if is_simple and is_multiple:
+            return self.visit_simple_assign(node)
+        elif is_compound and (is_multiple or is_sequence_node(node.value)):
+            return self.visit_compound_assign(node)
+        return node
+    
+    def visit_simple_assign(self, node):
+        """ Visit assignment node whose targets are all simple.
+        """
+        temp = gensym()
+        temp_target = to_name(temp, ast.Store())
+        stmts = [ ast.Assign([temp_target], node.value) ]
+        stmts += [ ast.Assign([target], to_name(temp))
+                   for target in node.targets ]
+        return stmts
+    
+    def visit_compound_assign(self, node):
+        """ Visit assignment node with at least one compound target.
+        """
+        # Determine number of values (arity) of compound assignment.
+        nvalues = { len(target.elts) for target in node.targets 
+                    if is_sequence_node(target) }
+        if len(nvalues) > 1:
+            # A multiple, compound assignment with different arities, e.g.,
+            # `x,y = a,b,c = ...` is not a syntax error in Python, though it
+            # probably should be because it's guaranteed to cause a runtime
+            # error. Raise the error here, since we cannot proceed.
+            raise SyntaxError("Multiple assignment with different arities")
+        nvalues = nvalues.pop()
 
-        # Case 1: at least one compound assignment.
-        if any(not isinstance(target, ast.Name) for target in node.targets):
-            # Determine number of values (arity) of compound assignment.
-            nvalues = { len(target.elts) for target in node.targets 
-                        if not isinstance(target, ast.Name) }
-            if len(nvalues) > 1:
-                # A multiple, compound assignment with different arities, e.g.
-                # `x,y = a,b,c = ...` is not a syntax error in Python, though
-                # it probably should be because it's guaranteed to cause a
-                # runtime error. Raise the error here, since we cannot proceed.
-                raise SyntaxError("Multiple assignment with different arities")
-            nvalues = nvalues.pop()
-
-            # Rewrite assignment as sequence of assignments.
-            temps = [ gensym() for i in range(nvalues) ]
+        # Assign temporary variables.
+        temps = [ gensym() for i in range(nvalues) ]
+        stmts = []
+        if is_sequence_node(node.value) and len(node.value.elts) == nvalues:
+            # Special case: RHS is sequence literal of correct length.
+            for i in range(nvalues):
+                temp_target = to_name(temps[i], ast.Store())
+                stmts.append(ast.Assign([temp_target], node.value.elts[i]))
+        else:
+            # General case.
             temp_target = to_tuple(
                 (to_name(temp, ast.Store()) for temp in temps), ast.Store())
-            stmts = [ ast.Assign([temp_target], node.value) ]
-            for target in reversed(node.targets):
-                if isinstance(target, ast.Name):
-                    temp_tuple = to_tuple(to_name(temp) for temp in temps)
-                    stmts += [ ast.Assign([target], temp_tuple) ]
-                else:
-                    stmts += [ ast.Assign([target.elts[i]], to_name(temps[i]))
-                               for i in range(nvalues) ]
-        
-        # Case 2: no compound assignments.
-        else:
-            temp = gensym()
-            temp_target = to_name(temp, ast.Store())
-            stmts = [ ast.Assign([temp_target], node.value) ]
-            stmts += [ ast.Assign([target], to_name(temp))
-                       for target in node.targets ]
-        
-        return stmts
+            stmts.append(ast.Assign([temp_target], node.value))
 
+        # Rewrite assignments as sequence of assignments.
+        for target in reversed(node.targets):
+            if is_sequence_node(target):
+                stmts.extend(ast.Assign([target.elts[i]], to_name(temps[i]))
+                             for i in range(nvalues))
+            else:
+                temp_tuple = to_tuple(to_name(temp) for temp in temps)
+                stmts.append(ast.Assign([target], temp_tuple))
+                        
+        return stmts
 
     def visit_Delete(self, node):
         """ Replace multiple deletion with single deletions.
         """
         self.generic_visit(node)
-        if len(node.targets) <= 1:
-            return node
-
-        return [ ast.Delete([node.target]) for target in node.targets ]
+        if len(node.targets) > 1:
+            return [ ast.Delete([node.target]) for target in node.targets ]
+        return node
 
 
 class AttributesToFunctions(ast.NodeTransformer):

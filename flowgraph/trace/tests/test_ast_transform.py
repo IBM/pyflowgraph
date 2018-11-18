@@ -29,22 +29,35 @@ class TestASTTransform(unittest.TestCase):
     """
 
     def test_single_assign(self):
-        """ Check that single assignments are preserved exactly?
+        """ Are single assignments are preserved exactly?
         """
-        node = ast.parse('x = 1')
+        node = ast.parse('x = f()')
         EliminateMultipleTargets().visit(node)
-        self.assertEqual(to_source(node).strip(), 'x = 1')
+        self.assertEqual(to_source(node).strip(), 'x = f()')
 
-        node = ast.parse('x, y = z')
+        node = ast.parse('x, y = f()')
         EliminateMultipleTargets().visit(node)
-        self.assertEqual(to_source(node).strip(), 'x, y = z')
+        self.assertEqual(to_source(node).strip(), 'x, y = f()')
+    
+    def test_compound_assign_with_tuple(self):
+        """ Can we simplify compound assignments with tuple literal values?
+        """
+        node = ast.parse('x, y = f(), g()')
+        gensym.reset()
+        EliminateMultipleTargets().visit(node)
+        self.assertEqual(to_source(node), dedent("""\
+            __gensym_1 = f()
+            __gensym_2 = g()
+            x = __gensym_1
+            y = __gensym_2
+        """))
 
     def test_multiple_assign_simple(self):
         """ Can we eliminate a simple multiple assignment?
         """
         node = ast.parse('x = y = f()')
-        EliminateMultipleTargets().visit(node)
         gensym.reset()
+        EliminateMultipleTargets().visit(node)
         self.assertEqual(to_source(node), dedent("""\
             __gensym_1 = f()
             x = __gensym_1
@@ -55,8 +68,8 @@ class TestASTTransform(unittest.TestCase):
         """ Can we eliminate a compound multiple assignment?
         """
         node = ast.parse('a, b = x, y = f()')
-        EliminateMultipleTargets().visit(node)
         gensym.reset()
+        EliminateMultipleTargets().visit(node)
         self.assertEqual(to_source(node), dedent("""\
             __gensym_1, __gensym_2 = f()
             x = __gensym_1
@@ -70,8 +83,8 @@ class TestASTTransform(unittest.TestCase):
         compound targets?
         """
         node = ast.parse('z = x, y = f()')
-        EliminateMultipleTargets().visit(node)
         gensym.reset()
+        EliminateMultipleTargets().visit(node)
         self.assertEqual(to_source(node), dedent("""\
             __gensym_1, __gensym_2 = f()
             x = __gensym_1

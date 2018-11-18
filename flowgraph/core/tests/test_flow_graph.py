@@ -436,14 +436,11 @@ class TestFlowGraph(unittest.TestCase):
         target.add_node('list', qual_name='__list__')
         target.add_node('min', qual_name='min')
         target.add_node('max', qual_name='max')
-        target.add_node('tuple', qual_name='__tuple__')
         target.add_node('add', qual_name='add')
         target.add_edge('list', 'min', sourceport='return', targetport='0')
         target.add_edge('list', 'max', sourceport='return', targetport='0')
-        target.add_edge('min', 'tuple', sourceport='return', targetport='0')
-        target.add_edge('max', 'tuple', sourceport='return', targetport='1')
-        target.add_edge('tuple', 'add', sourceport='return.0', targetport='0')
-        target.add_edge('tuple', 'add', sourceport='return.1', targetport='1')
+        target.add_edge('min', 'add', sourceport='return', targetport='0')
+        target.add_edge('max', 'add', sourceport='return', targetport='1')
         self.assert_isomorphic(actual, target)
     
     def test_track_inside_list(self):
