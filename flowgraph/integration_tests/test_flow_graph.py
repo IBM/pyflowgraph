@@ -88,7 +88,7 @@ class IntegrationTestFlowGraph(unittest.TestCase):
         # Save the graph as GraphML for consumption by downstream tests.
         if save:
             outname = str(data_path.joinpath(name + '.xml'))
-            graphml = flow_graph_to_graphml(graph, simplify_outputs=True)
+            graphml = flow_graph_to_graphml(graph, outputs='simplify')
             write_graphml(graphml, outname)
         
         # Check consistency of node ports with edge source and target ports.

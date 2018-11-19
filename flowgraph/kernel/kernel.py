@@ -16,7 +16,7 @@ from __future__ import absolute_import
 
 from ipykernel.ipkernel import IPythonKernel
 from networkx.readwrite import json_graph
-from traitlets import Bool, Instance, Type, default
+from traitlets import Bool, Enum, Instance, Type, default
 
 from ..core.annotator import Annotator
 from ..core.flow_graph import flow_graph_to_graphml
@@ -33,13 +33,14 @@ class FlowGraphIPythonKernel(IPythonKernel):
     """ IPython kernel with support for program analysis and object inspection.
     """
     
-    # Whether to simplify the flow graph by removing certain outputs.
+    # Whether to simplify the flow graph by removing some/all outputs.
     # See `flow_graph.flow_graph_to_graphml`.
-    simplify_flow_graph_outputs = Bool(True).tag(config=True)
+    flow_graph_outputs = Enum(
+        ['all', 'simplify', 'none'], default_value='simplify').tag(config=True)
     
     # Whether to store annotated slots of objects in the flow graph.
     # See `flow_graph_builder.FlowGraphBuilder`.
-    store_flow_graph_slots = Bool(True).tag(config=True)
+    flow_graph_slots = Bool(True).tag(config=True)
     
     # Annotator for objects and functions.
     annotator = Instance(Annotator)
@@ -79,9 +80,7 @@ class FlowGraphIPythonKernel(IPythonKernel):
         if self._trace_flag and reply_content['status'] == 'ok':
             graph = self._builder.graph
             graphml = flow_graph_to_graphml(
-                graph,
-                simplify_outputs=self.simplify_flow_graph_outputs,
-            )
+                graph, outputs=self.flow_graph_outputs)
             data = write_graphml_str(graphml, prettyprint=False)
             payload = {
                 'source': 'flow_graph',
@@ -136,7 +135,7 @@ class FlowGraphIPythonKernel(IPythonKernel):
     def _builder_default(self):
         builder = FlowGraphBuilder(
             annotator=self.annotator,
-            store_slots=self.store_flow_graph_slots,
+            store_slots=self.flow_graph_slots,
         )
 
         def handler(changed):

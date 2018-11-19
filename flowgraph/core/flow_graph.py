@@ -58,19 +58,26 @@ def copy_flow_graph(source_graph, dest_graph):
         if edge[0] not in skip and edge[1] not in skip)
 
 
-def flow_graph_to_graphml(graph, simplify_outputs=False):
+def flow_graph_to_graphml(graph, outputs=None):
     """ Prepare a flow graph for serialization as GraphML.
-    
-    Returns another NetworkX graph suitable for serialization, not raw XML.
-    To perform the serialization, call `graphml.write_graphml`.
-    
-    TODO: Apply recursively to nested flow graphs.
+
+    Returns another NetworkX graph suitable for serialization, not raw XML. To
+    perform the serialization, call `graphml.write_graphml`.
+
+    Since there are typically many outputs, the outputs can be pruned by
+    setting the `outputs` option. Choose 'simplify to remove all outputs that
+    are inputs to another call node, leaving only the "unused" outputs for the
+    output ports. This convention does not always yield what would intuitively
+    be regarded as the "outputs" of a particular program but one cannot expect
+    too much from such a heuristic. Alternatively, choose 'none' to simply
+    remove all the outputs.
     """
-    graph = graph.copy()
     # Bring the flow graph into conformance with the conventions for
     # representing wiring diagrams in GraphML.
+    # TODO: Apply recursively to nested flow graphs.
     
     # The top-level graph must contain a single node, representing the outer box.
+    graph = graph.copy()
     node = '__root__'
     outer = nx.MultiDiGraph()
     outer.add_node(node, graph=graph)
@@ -79,11 +86,7 @@ def flow_graph_to_graphml(graph, simplify_outputs=False):
     # that might be missing a source port (resp. target port) are the edges
     # from the input node (resp. to the output node) because these are
     # "unknown" inputs (resp. "last-modified" outputs). We make up port names
-    # for these. Since there are typically many outputs, there is an option
-    # remove all outputs that are inputs to another call node, leaving only
-    # the "unused" outputs for the output ports. This convention does not
-    # always yield what would intuitively be regarded as the "outputs" of a
-    # particular program but one cannot expect too much from such a heuristic.
+    # for these nodes.
     ports = {}
     input_node = graph.graph['input_node']
     output_node = graph.graph['output_node']
@@ -103,7 +106,8 @@ def flow_graph_to_graphml(graph, simplify_outputs=False):
     
     noutputs = 0
     for src, _, key, data in list(graph.in_edges(output_node, keys=True, data=True)):
-        if simplify_outputs and _ncopies(graph, src, data['id']) > 0:
+        if (outputs == 'none' or
+            (outputs == 'simplify' and _ncopies(graph, src, data['id']) > 0)):
             graph.remove_edge(src, output_node, key=key)
         else:
             noutputs += 1

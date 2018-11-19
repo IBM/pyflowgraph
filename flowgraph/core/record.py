@@ -31,7 +31,7 @@ from .remote_annotation_db import RemoteAnnotationDB
 
 
 def record_code(code, codename=None, out=None, env=None, cwd=None, db=None,
-                simplify_outputs=True, **kwargs):
+                graph_outputs=None, **kwargs):
     """ Execute and record Python code.
 
     Parameters
@@ -55,8 +55,8 @@ def record_code(code, codename=None, out=None, env=None, cwd=None, db=None,
     db : AnnotationDB (optional)
         Annotation database, by default the standard remoate annotation DB
     
-    simplify_outputs : bool (optional)
-        Whether to simplify outputs when writing GraphML
+    graph_outputs : str (optional)
+        Whether and how to prune outputs of flow graph when writing GraphML
 
     **kwargs
         Extra arguments to pass to `FlowGraphBuilder`
@@ -87,7 +87,8 @@ def record_code(code, codename=None, out=None, env=None, cwd=None, db=None,
     graph = builder.graph
 
     if out is not None:
-        graphml = flow_graph_to_graphml(graph, simplify_outputs=simplify_outputs)
+        graph_outputs = graph_outputs or 'simplify'
+        graphml = flow_graph_to_graphml(graph, outputs=graph_outputs)
         write_graphml(graphml, out)
 
     return graph

@@ -971,7 +971,7 @@ class TestFlowGraph(unittest.TestCase):
         ])
         self.assertEqual(outputs, sorted([ self.id('foo'), self.id('bar') ]))
         
-        outer = flow_graph_to_graphml(recorded_graph, simplify_outputs=True)
+        outer = flow_graph_to_graphml(recorded_graph, outputs='simplify')
         root = list(outer.nodes)[0]
         graph, ports = outer.nodes[root]['graph'], outer.nodes[root]['ports']
         outputs = sorted(data['id'] for _, _, data in
