@@ -254,10 +254,10 @@ class TestASTTransform(unittest.TestCase):
     def test_inplace_setitem(self):
         """ Can we replace an inplace indexed binary op with function calls?
         """
-        node = ast.parse('x[:n] += 1')
+        node = ast.parse('x[n] += 1')
         IndexingToFunctions('op').visit(node)
         self.assertEqual(to_source(node), dedent("""\
-            op.setitem(x, slice(n), op.iadd(op.getitem(x, slice(n)), 1))
+            op.setitem(x, n, op.iadd(op.getitem(x, n), 1))
         """))
     
     def test_inplace_setitem_gensym_target(self):
@@ -269,6 +269,30 @@ class TestASTTransform(unittest.TestCase):
         self.assertEqual(to_source(node), dedent("""\
             __gensym_1 = x.data
             op.setitem(__gensym_1, n, op.iadd(op.getitem(__gensym_1, n), 1))
+        """))
+    
+    def test_inplace_setitem_gensym_index(self):
+        """ Is the index value gensym-ed in inplace indexed operations?
+        """
+        node = ast.parse('x[m:m+n] += 1')
+        gensym.reset()
+        IndexingToFunctions('op').visit(node)
+        self.assertEqual(to_source(node), dedent("""\
+            __gensym_1 = slice(m, m + n)
+            op.setitem(x, __gensym_1, op.iadd(op.getitem(x, __gensym_1), 1))
+        """))
+    
+    def test_inplace_setitem_gensym_both(self):
+        """ Are both target and index values gensym-ed in inplace indexed ops?
+        """
+        node = ast.parse('x.data[m:m+n] += 1')
+        gensym.reset()
+        IndexingToFunctions('op').visit(node)
+        self.assertEqual(to_source(node), dedent("""\
+            __gensym_1 = x.data
+            __gensym_2 = slice(m, m + n)
+            op.setitem(__gensym_1, __gensym_2, op.iadd(op.getitem(__gensym_1,
+                __gensym_2), 1))
         """))
     
     def test_list_literal(self):

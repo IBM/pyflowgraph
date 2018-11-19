@@ -41,7 +41,7 @@ class TestInspectNames(unittest.TestCase):
         """ Can we get the qualified name of a class?
         """
         self.assertEqual(get_class_qual_name(Toplevel), 'Toplevel')
-        if sys.version_info[0] >= 3 and sys.version_info[1] >= 3:
+        if sys.version_info >= (3, 3):
             self.assertEqual(get_class_qual_name(Nested.Inner), 'Nested.Inner')
     
     def test_get_class_full_name(self):

@@ -31,7 +31,7 @@ def get_class_qual_name(typ):
     
     See PEP 3155: "Qualified name for classes and functions"
     """
-    if sys.version_info[0] >= 3 and sys.version_info[1] >= 3:
+    if sys.version_info >= (3, 3):
         return typ.__qualname__
     else:
         # Not possible on older versions of Python. Just give up.

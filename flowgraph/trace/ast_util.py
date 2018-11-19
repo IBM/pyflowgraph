@@ -22,6 +22,12 @@ import six
 import sys
 from threading import Lock
 
+# Does `ast.Starred` exist?
+ast_has_starred = sys.version_info >= (3, 5)
+
+# Does `ast.NameConstant` exist?
+ast_has_name_constant = sys.version_info >= (3, 4)
+
 
 class Gensym(object):
     """ Generator of unique names ("symbols") ala LISP.
@@ -50,7 +56,7 @@ gensym = Gensym()
 def to_call(func, args=[], keywords=[], starargs=None, kwargs=None):
     """ Create a Call AST node.
     """
-    if sys.version_info.major >= 3 and sys.version_info.minor >= 5:
+    if ast_has_starred:
         # Representation of *args and **kwargs changed in Python 3.5.
         assert starargs is None and kwargs is None
         return ast.Call(func, args, keywords)
@@ -76,8 +82,7 @@ def to_name(str_or_name, ctx=None):
 def to_name_constant(value):
     """ Create a NameConstant AST node from a constant (True, False, None).
     """
-    if sys.version_info.major >= 3 and sys.version_info.minor >= 4:
-        # NameConstant AST node new in Python 3.4.
+    if ast_has_name_constant:
         return ast.NameConstant(value)
     else:
         return to_name(str(value))

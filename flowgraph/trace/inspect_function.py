@@ -29,7 +29,7 @@ except ImportError:
 
 # As of Python 3.6, **kwargs is finally guaranteed to be ordered.
 # https://www.python.org/dev/peps/pep-0468/
-kwargs_ordered = sys.version_info.major >= 3 and sys.version_info.minor >= 6
+kwargs_ordered = sys.version_info >= (3, 6)
 
 
 def bind_arguments(fun, *args, **kwargs):

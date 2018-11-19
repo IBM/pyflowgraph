@@ -17,14 +17,11 @@
 from __future__ import absolute_import
 
 import ast
-import sys
-from .ast_util import get_single_target, to_attribute, to_call, to_name, \
-    to_name_constant, to_list, to_tuple
 
 from traitlets import HasTraits, Any
 
-# Does `ast.Starred` exist?
-ast_has_starred = sys.version_info.major >= 3 and sys.version_info.minor >= 5
+from .ast_util import ast_has_starred, get_single_target, \
+    to_attribute, to_call, to_name, to_name_constant, to_list, to_tuple
 
 
 class ASTTracer(HasTraits):

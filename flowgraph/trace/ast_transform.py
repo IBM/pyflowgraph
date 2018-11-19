@@ -23,7 +23,7 @@ from __future__ import absolute_import
 import ast
 import six
 
-from .ast_util import gensym, get_single_target, set_ctx, \
+from .ast_util import ast_has_name_constant, gensym, get_single_target, set_ctx, \
     to_attribute, to_call, to_name, to_name_constant, to_list, to_tuple
 
 is_sequence_node = lambda node: isinstance(node, (ast.List, ast.Tuple))
@@ -222,16 +222,21 @@ class IndexingToFunctions(ast.NodeTransformer):
             return node
 
         # AST node for target value, gensym-ed if necessary.
-        if isinstance(target.value, ast.Name):
+        if self.can_reevaluate(target.value):
             target_node = target.value
         else:
             target_node = to_name(gensym())
             stmts.append(ast.Assign(
                 [set_ctx(target_node, ast.Store())], target.value))
         
-        # AST node for index.
-        # FIXME: Need to gensym the slice expression in some cases.
-        index_node = self.index_to_expr(target.slice)
+        # AST node for index, gensym-ed if necessary.
+        index_expr = self.index_to_expr(target.slice)
+        if self.can_reevaluate(index_expr):
+            index_node = index_expr
+        else:
+            index_node = to_name(gensym())
+            stmts.append(ast.Assign(
+                [set_ctx(index_node, ast.Store())], index_expr))
         
         # Main AST node for the indexed augemented assignment.
         stmts.append(ast.Expr(
@@ -249,6 +254,13 @@ class IndexingToFunctions(ast.NodeTransformer):
         ))
 
         return stmts
+    
+    def can_reevaluate(self, node):
+        """ Whether the AST node can be safely evaluated twice.
+        """
+        return isinstance(node, (ast.Name, ast.Num, ast.Str)) or \
+            (six.PY3 and isinstance(node, ast.Bytes)) or \
+            (ast_has_name_constant and isinstance(node, ast.NameConstant))
 
 
 class InplaceOperatorsToFunctions(ast.NodeTransformer):
