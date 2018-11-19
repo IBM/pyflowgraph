@@ -255,10 +255,21 @@ class TestASTTransform(unittest.TestCase):
         """ Can we replace an inplace indexed binary op with function calls?
         """
         node = ast.parse('x[:n] += 1')
-        IndexingToFunctions().visit(node)
-        result = 'operator.setitem(x, slice(n), '\
-            'operator.iadd(operator.getitem(x, slice(n)), 1))'
-        self.assertEqual(to_source(node).strip(), result)
+        IndexingToFunctions('op').visit(node)
+        self.assertEqual(to_source(node), dedent("""\
+            op.setitem(x, slice(n), op.iadd(op.getitem(x, slice(n)), 1))
+        """))
+    
+    def test_inplace_setitem_gensym_target(self):
+        """ Is the target value gensym-ed in inplace indexed operations?
+        """
+        node = ast.parse('x.data[n] += 1')
+        gensym.reset()
+        IndexingToFunctions('op').visit(node)
+        self.assertEqual(to_source(node), dedent("""\
+            __gensym_1 = x.data
+            op.setitem(__gensym_1, n, op.iadd(op.getitem(__gensym_1, n), 1))
+        """))
     
     def test_list_literal(self):
         """ Can we replace a list literal with a function call?

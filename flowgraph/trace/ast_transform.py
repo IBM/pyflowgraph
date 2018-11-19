@@ -215,23 +215,40 @@ class IndexingToFunctions(ast.NodeTransformer):
 
         Example: `x[0] += 1` -> `setitem(x, 0, iadd(getitem(x, 0), 1)))`
         """
-        # FIXME: Gensym the subscript value to avoid two evaluations.
         self.generic_visit(node)
+        stmts = []
         target = node.target
-        if isinstance(target, ast.Subscript):
-            index = self.index_to_expr(target.slice)
-            return ast.Expr(to_call(to_attribute(self.operator, 'setitem'), [
-                target.value,
-                index,
+        if not isinstance(target, ast.Subscript):
+            return node
+
+        # AST node for target value, gensym-ed if necessary.
+        if isinstance(target.value, ast.Name):
+            target_node = target.value
+        else:
+            target_node = to_name(gensym())
+            stmts.append(ast.Assign(
+                [set_ctx(target_node, ast.Store())], target.value))
+        
+        # AST node for index.
+        # FIXME: Need to gensym the slice expression in some cases.
+        index_node = self.index_to_expr(target.slice)
+        
+        # Main AST node for the indexed augemented assignment.
+        stmts.append(ast.Expr(
+            to_call(to_attribute(self.operator, 'setitem'), [
+                target_node,
+                index_node,
                 to_call(self.op_to_function(node.op), [
                     to_call(to_attribute(self.operator, 'getitem'), [
-                        target.value,
-                        index,
+                        target_node,
+                        index_node,
                     ]),
                     node.value
                 ])
-            ]))
-        return node
+            ])
+        ))
+
+        return stmts
 
 
 class InplaceOperatorsToFunctions(ast.NodeTransformer):
