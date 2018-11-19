@@ -17,6 +17,7 @@ from __future__ import absolute_import
 from collections import deque, OrderedDict
 from copy import deepcopy
 import six
+import sys
 import types
 from weakref import WeakKeyDictionary
 
@@ -24,19 +25,13 @@ from ipykernel.jsonutil import json_clean
 import networkx as nx
 from traitlets import HasTraits, Bool, Dict, Instance, Unicode, default
 
-from flowgraph.kernel.slots import get_slot
-from flowgraph.trace.inspect_name import get_class_module_name, \
-    get_class_qual_name
-from flowgraph.trace.object_tracker import ObjectTracker
-from flowgraph.trace.trace_event import TraceEvent, TraceCall, TraceReturn, \
-    TraceAccess, TraceAssign, TraceDelete
 from .annotator import Annotator
 from .flow_graph import new_flow_graph
-
-# Don't record `getattr` when the attribute has one of these types.
-ignore_attr_types = (type, types.ModuleType,
-                     types.FunctionType, types.MethodType,
-                     types.BuiltinFunctionType, types.BuiltinMethodType)
+from ..kernel.slots import get_slot
+from ..trace.inspect_name import get_class_module_name, get_class_qual_name
+from ..trace.object_tracker import ObjectTracker
+from ..trace.trace_event import TraceEvent, TraceCall, TraceReturn, \
+    TraceAccess, TraceAssign, TraceDelete
 
 
 class FlowGraphBuilder(HasTraits):
@@ -94,6 +89,26 @@ class FlowGraphBuilder(HasTraits):
         self._stack.clear()
         self._stack.append(_CallContext(graph=graph))
     
+    def is_attribute_ignorable(self, obj):
+        """ Can a `getattr` call returning this attribute be removed?
+
+        We don't explictly record the retrieval of function, method, and module
+        objects (although of course function *calls* are recorded!).
+        """
+        # Treat NumPy ufuncs as functions.
+        # XXX: This whole function seems like a hack. Can we do better?
+        np = sys.modules.get('numpy')
+        if np and isinstance(obj, np.ufunc):
+            return True
+
+        # Does the object have a "function" type? Note that we don't check if
+        # the object is `callable()`, which is too liberal.
+        return isinstance(
+            obj,
+            (type, types.ModuleType, types.FunctionType, types.MethodType,
+             types.BuiltinFunctionType, types.BuiltinMethodType)
+        )
+    
     def is_primitive(self, obj):
         """ Is the object considered primitive?
         
@@ -139,8 +154,8 @@ class FlowGraphBuilder(HasTraits):
         a hash of the underlying data.
         """
         # Special case: important functions knowns to be impure.
-        if event.qual_name in ('setattr', 'setitem') and \
-                arg_name in ('obj', '0'):
+        if (event.qual_name in ('setattr', 'setitem') and
+            arg_name in ('obj', '0')):
             return False
         
         # Default: pure unless explicitly annotated otherwise!
@@ -189,11 +204,10 @@ class FlowGraphBuilder(HasTraits):
         context = self._stack[-1]
         graph = context.graph
 
-        # Special case: If an attribute is a function or a module, remove the
-        # call node and exit. Functions and modules are not explicitly recorded
-        # (though of course function *calls* are!).
+        # Special case: Remove `getattr` calls yielding functions or modules.
         return_value = event.value
-        if event.function is getattr and isinstance(return_value, ignore_attr_types):
+        if (event.function is getattr and 
+            self.is_attribute_ignorable(return_value)):
             graph.remove_node(node)
             return
         

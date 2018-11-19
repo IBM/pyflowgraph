@@ -160,6 +160,26 @@ class IntegrationTestFlowGraph(unittest.TestCase):
                         annotation='python/numpy/ndarray')
         self.assert_isomorphic(graph, target)
     
+    def test_numpy_ufunc(self):
+        """ Calling a NumPy universal function ("ufunc").
+        """
+        graph = self.record_script("numpy_ufunc")
+        graph.remove_node(graph.graph['output_node'])
+        
+        target = new_flow_graph()
+        target.remove_node(target.graph['output_node'])
+        target.add_node('pi', qual_name='getattr', slot='pi')
+        target.add_node('mul', qual_name='mul')
+        target.add_node('linspace', qual_name='linspace')
+        target.add_node('sin', qual_name='sin')
+        target.add_edge('pi', 'mul', sourceport='return', targetport='1',
+                        annotation='python/builtins/float')
+        target.add_edge('mul', 'linspace', sourceport='return', targetport='stop',
+                        annotation='python/builtins/float')
+        target.add_edge('linspace', 'sin', sourceport='return', targetport='0',
+                        annotation='python/numpy/ndarray')
+        self.assert_isomorphic(graph, target)
+    
     def test_pandas_read_sql(self):
         """ Read SQL table using pandas and SQLAlchemy.
         """
