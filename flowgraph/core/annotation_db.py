@@ -38,9 +38,10 @@ class AnnotationDB(HasTraits):
         (JSON-able dictionaries).
         """
         for note in notes:
-            doc = Annotation(note)
-            doc.pk = note['_id']
-            self._database.save(doc)
+            if note['schema'] == 'annotation' and note['language'] == 'python':
+                doc = Annotation(note)
+                doc.pk = note['_id']
+                self._database.save(doc)
     
     def load_file(self, filename):
         """ Load annotations from a JSON file.
