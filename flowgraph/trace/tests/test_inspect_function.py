@@ -16,6 +16,7 @@ from __future__ import absolute_import
 
 from collections import OrderedDict
 import fractions
+import sys
 import unittest
 
 from ..inspect_function import bind_arguments
@@ -55,7 +56,10 @@ class TestInspectFunctions(unittest.TestCase):
         """
         x = [1,2,3]
         args = bind_arguments(x.append, 4)
-        self.assertEqual(args, OrderedDict([('0',x), ('1',4)]))
+        self.assertEqual(args, OrderedDict([
+            ('self', x),
+            ('object' if sys.version_info >= (3,7) else '1', 4)
+        ]))
     
     def test_bind_var_args(self):
         """ Can we bind *args of a function?

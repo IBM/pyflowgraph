@@ -18,8 +18,8 @@ from __future__ import absolute_import
 
 from collections import OrderedDict
 import inspect
+import string
 import sys
-import types
 try:
     # Python 3.3+
     from inspect import signature
@@ -39,35 +39,27 @@ def bind_arguments(fun, *args, **kwargs):
     `inspect.signature`, the `self` parameter of bound instance methods is
     included as an argument.
     """
-    if inspect.ismethod(fun) and not inspect.isclass(fun.__self__):
-        # Case 1: Bound instance method, implemented in Python.
-        # Reduce to Case 2 below because `Signature.bind()`` excludes `self`
-        # argument in bound methods.
-        args = (fun.__self__,) + args
-        fun = fun.__func__
-    
+    arguments = OrderedDict()
+
+    # If the callable is an instance method, bind the `self` argument.
+    if is_instance_method(fun):
+        arguments['self'] = fun.__self__
+
+    # Bind all other arguments, preferably using `inspect.signature`.
     try:
-        # Case 2: Callable implemented in Python.
         sig = signature(fun)
     except ValueError:
         # `inspect.signature()` doesn't work on builtins.
         # https://stackoverflow.com/q/42134927
-        pass
+        arguments.update(_bind_arguments_without_signature(args, kwargs,
+            arg_name=_fallback_argument_namer(fun)))
     else:
-        # Case 2, cont.: If we got a signature, use it and exit.
-        return bind_arguments_with_signature(sig, *args, **kwargs)
-    
-    fun_self = getattr(fun, '__self__', None)
-    if fun_self is not None and not isinstance(fun_self, types.ModuleType):
-        # Case 3: Method implemented in C ("builtin method").
-        # Reduce to Case 4 below.
-        args = (fun_self,) + args
+        arguments.update(_bind_arguments_with_signature(sig, args, kwargs))
 
-    # Case 4: Callable implemented in C ("builtin")
-    return bind_arguments_without_signature(*args, **kwargs)
+    return arguments
 
 
-def bind_arguments_with_signature(sig, *args, **kwargs):
+def _bind_arguments_with_signature(sig, args, kwargs={}):
     """ Bind function arguments using a `Signature` object.
     """
     bound = sig.bind(*args, **kwargs)
@@ -80,7 +72,7 @@ def bind_arguments_with_signature(sig, *args, **kwargs):
                 args = arguments.pop(param.name)
             except KeyError: pass
             else:
-                arguments.update(bind_arguments_without_signature(*args))
+                arguments.update(_bind_arguments_without_signature(args))
         elif param.kind == param.VAR_KEYWORD:
             try:
                 kwargs = arguments.pop(param.name)
@@ -94,13 +86,34 @@ def bind_arguments_with_signature(sig, *args, **kwargs):
     return arguments
 
 
-def bind_arguments_without_signature(*args, **kwargs):
+def _bind_arguments_without_signature(args, kwargs={}, arg_name=str):
     """ Bind function arguments in the absence of a signature.
 
-    Useful for builtin functions, whose signatures simply cannot be inspected.
+    Useful for builtin functions, whose signatures cannot be inspected.
     """
     arguments = OrderedDict()
     for i, value in enumerate(args):
-        arguments[str(i)] = value
+        arguments[arg_name(i)] = value
     arguments.update(kwargs)
     return arguments
+
+
+def _fallback_argument_namer(fun):
+    if getattr(fun, '__module__', None) in ('operator', '_operator'):
+        # Not strictly necessary but ensures consistency between Python 3.7+
+        # and earlier versions of Python, which makes testing more convenient.
+        return lambda i: string.ascii_lowercase[i]
+    elif is_instance_method(fun):
+        return lambda i: str(i+1)
+    else:
+        return str
+
+
+def is_instance_method(fun):
+    """ Is the callable a bound instance method?
+
+    More reliable than `inspect.ismethod`.
+    """
+    fun_self = getattr(fun, '__self__', None)
+    return fun_self is not None and not inspect.isclass(fun_self) and \
+        not inspect.ismodule(fun_self)

@@ -15,7 +15,6 @@
 from __future__ import absolute_import
 
 from collections import deque, OrderedDict
-from copy import deepcopy
 import six
 import sys
 import types
@@ -120,9 +119,14 @@ class FlowGraphBuilder(HasTraits):
         considered primitive. The default implementation allows any object which
         is JSON-able (essentially, the scalar types plus the built-in container
         types if their contents are JSON-able).
-        
-        Note: any objects stored as "value" data will be deep-copied.
         """
+        # Make sure not to modify the passed object.
+        if isinstance(obj, types.GeneratorType):
+            # Do not pass a generator through `json_clean`, as it will convert
+            # it to list, resulting in an empty generator.
+            return False
+        
+        # Default logic: run IPython's `json_clean`.
         try:
             json_clean(obj)
         except ValueError:
@@ -543,7 +547,7 @@ class FlowGraphBuilder(HasTraits):
         
         # Add value if the object is primitive.
         if self.is_primitive(obj):
-            data['value'] = deepcopy(obj)
+            data['value'] = json_clean(obj)
         elif isinstance(obj, types.ModuleType):
             data['value'] = obj.__name__
 

@@ -134,7 +134,7 @@ class IntegrationTestFlowGraph(unittest.TestCase):
         target.add_node('reshape', qual_name='ndarray.reshape')
         target.add_edge('rand', 'shape', sourceport='return', targetport='0',
                         annotation='python/numpy/ndarray')
-        target.add_edge('arange', 'reshape', sourceport='return', targetport='0',
+        target.add_edge('arange', 'reshape', sourceport='return', targetport='self',
                         annotation='python/numpy/ndarray')
         target.add_edge('shape', 'reshape', sourceport='return', targetport='1')
         self.assert_isomorphic(graph, target)
@@ -152,11 +152,11 @@ class IntegrationTestFlowGraph(unittest.TestCase):
         target.add_node('extslice', qual_name='__tuple__')
         target.add_node('getitem', qual_name='getitem')
         target.add_node('gt', qual_name='gt')
-        target.add_edge('rand', 'getitem', sourceport='return', targetport='0',
+        target.add_edge('rand', 'getitem', sourceport='return', targetport='a',
                         annotation='python/numpy/ndarray')
         target.add_edge('slice', 'extslice', sourceport='return', targetport='0')
-        target.add_edge('extslice', 'getitem', sourceport='return', targetport='1')
-        target.add_edge('getitem', 'gt', sourceport='return', targetport='0',
+        target.add_edge('extslice', 'getitem', sourceport='return', targetport='b')
+        target.add_edge('getitem', 'gt', sourceport='return', targetport='a',
                         annotation='python/numpy/ndarray')
         self.assert_isomorphic(graph, target)
     
@@ -172,7 +172,7 @@ class IntegrationTestFlowGraph(unittest.TestCase):
         target.add_node('mul', qual_name='mul')
         target.add_node('linspace', qual_name='linspace')
         target.add_node('sin', qual_name='sin')
-        target.add_edge('pi', 'mul', sourceport='return', targetport='1',
+        target.add_edge('pi', 'mul', sourceport='return', targetport='b',
                         annotation='python/builtins/float')
         target.add_edge('mul', 'linspace', sourceport='return', targetport='stop',
                         annotation='python/builtins/float')
@@ -313,7 +313,7 @@ class IntegrationTestFlowGraph(unittest.TestCase):
                         annotation='python/sklearn/mean-squared-error')
         target.add_edge('read', 'X', sourceport='return', targetport='self',
                         annotation='python/pandas/data-frame')
-        target.add_edge('read', 'y', sourceport='return', targetport='0',
+        target.add_edge('read', 'y', sourceport='return', targetport='a',
                         annotation='python/pandas/data-frame')
         target.add_edge('lm', 'fit', sourceport='return', targetport='self',
                         annotation='python/sklearn/linear-regression')
