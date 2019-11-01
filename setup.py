@@ -19,15 +19,15 @@ setup_args = {
         'requests',
         'jsonpickle',
         'click',
-        'networkx>=2.0',
+        'networkx<=2.3',
         'cachetools==2.1.0',
-        'blitzdb>=0.3',
+        'blitzdb @ git+https://github.com/epatters/blitzdb.git@py37',
         'sqlalchemy',
         'ipykernel>=4.3.0',
     ],
     'extras_require': {
         'integration_tests': [
-            'numpy',
+            'numpy>=1.16',
             'scipy',
             'pandas',
             'sklearn',

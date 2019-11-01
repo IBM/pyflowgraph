@@ -439,8 +439,8 @@ class TestFlowGraph(unittest.TestCase):
         target.add_node('add', qual_name='add')
         target.add_edge('list', 'min', sourceport='return', targetport='0')
         target.add_edge('list', 'max', sourceport='return', targetport='0')
-        target.add_edge('min', 'add', sourceport='return', targetport='0')
-        target.add_edge('max', 'add', sourceport='return', targetport='1')
+        target.add_edge('min', 'add', sourceport='return', targetport='a')
+        target.add_edge('max', 'add', sourceport='return', targetport='b')
         self.assert_isomorphic(actual, target)
     
     def test_track_inside_list(self):
