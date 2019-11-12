@@ -19,7 +19,7 @@ setup_args = {
         'requests',
         'jsonpickle',
         'click',
-        'networkx<=2.3',
+        'networkx>=2.0',
         'cachetools==2.1.0',
         'blitzdb @ git+https://github.com/adewes/blitzdb.git',
         'sqlalchemy',

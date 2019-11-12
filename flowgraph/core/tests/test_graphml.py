@@ -110,7 +110,7 @@ class TestGraphMLIO(unittest.TestCase):
         graph = nx.Graph()
         graph.add_node('root')
         nested = nx.DiGraph(node='__node__')
-        nested.add_path(['__node__', 'n1', 'n2', '__node__'])
+        nx.add_path(nested, ['__node__', 'n1', 'n2', '__node__'])
         graph.nodes['root']['graph'] = nested
 
         recovered = roundtrip(graph)
@@ -127,7 +127,7 @@ class TestGraphMLIO(unittest.TestCase):
         graph = nx.DiGraph()
         graph.add_node('root')
         nested = nx.DiGraph(input_node='__in__', output_node='__out__')
-        nested.add_path(['__in__', 'n1', 'n2', '__out__'])
+        nx.add_path(nested, ['__in__', 'n1', 'n2', '__out__'])
         graph.nodes['root']['graph'] = nested
 
         recovered = roundtrip(graph)

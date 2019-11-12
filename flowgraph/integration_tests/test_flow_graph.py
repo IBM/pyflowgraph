@@ -68,12 +68,12 @@ class IntegrationTestFlowGraph(unittest.TestCase):
         for src, tgt, data in graph.edges(data=True):
             if src != input_node:
                 src_port = data['sourceport']
-                ports = graph.node[src]['ports']
+                ports = graph.nodes[src]['ports']
                 self.assertIn(src_port, ports)
                 self.assertEqual(ports[src_port]['portkind'], 'output')
             if tgt != output_node:
                 tgt_port = data['targetport']
-                ports = graph.node[tgt]['ports']
+                ports = graph.nodes[tgt]['ports']
                 self.assertIn(tgt_port, ports)
                 self.assertEqual(ports[tgt_port]['portkind'], 'input')
     

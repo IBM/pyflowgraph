@@ -389,7 +389,7 @@ class TestFlowGraph(unittest.TestCase):
         self.assert_isomorphic(actual, target)
 
         node = find_node(actual, lambda n: n.get('qual_name') == 'getattr')
-        port_data = actual.node[node]['ports']['0']
+        port_data = actual.nodes[node]['ports']['0']
         self.assertEqual(port_data['qual_name'], 'module')
         self.assertEqual(port_data['value'], objects.__name__)
     
