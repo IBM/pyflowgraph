@@ -21,7 +21,7 @@ setup_args = {
         'click',
         'networkx<=2.3',
         'cachetools==2.1.0',
-        'blitzdb @ git+https://github.com/epatters/blitzdb.git@py37',
+        'blitzdb @ git+https://github.com/adewes/blitzdb.git',
         'sqlalchemy',
         'ipykernel>=4.3.0',
     ],
