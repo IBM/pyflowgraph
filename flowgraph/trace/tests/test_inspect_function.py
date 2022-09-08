@@ -15,7 +15,7 @@
 from __future__ import absolute_import
 
 from collections import OrderedDict
-import fractions
+import fractions, math
 import sys
 import unittest
 
@@ -29,8 +29,8 @@ class TestInspectFunctions(unittest.TestCase):
     def test_bind_function(self):
         """ Can we bind arguments to an ordinary function?
         """
-        args = bind_arguments(fractions.gcd, 4, 10)
-        self.assertEqual(args, OrderedDict([('a',4), ('b',10)]))
+        args = bind_arguments(math.pow, 4, 10)
+        self.assertEqual(args, OrderedDict([('x',4), ('y',10)]))
     
     def test_bind_constructor(self):
         """ Can we bind arguments to an object constructor?

@@ -176,8 +176,11 @@ class IndexingToFunctions(ast.NodeTransformer):
         elif isinstance(index, ast.ExtSlice):
             indexes = list(map(self.index_to_expr, index.dims))
             return ast.Tuple(elts=indexes, ctx=ast.Load())
+        elif isinstance(index, ast.Tuple):
+            elts = list(map(self.index_to_expr, index.elts))
+            return ast.Tuple(elts=elts, ctx=ast.Load())
         else:
-            raise TypeError("Not an index: %s" % index)
+            return index
     
     def visit_Subscript(self, node):
         """ Convert indexing to `getitem` call.
