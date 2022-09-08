@@ -76,14 +76,14 @@ class Annotator(HasTraits):
     # Private interface
     
     @cachedmethod(cache=attrgetter('_func_cache'),
-                  key=lambda self, func: self._get_func_key(func))
+                  key=lambda func: hashkey(_get_func_key(func)))
     def _cached_notate_function(self, func):
         """ Notate a function object, returning the primary key or None.
         """        
         # If the function is a method, try to find a method annotation.
         note = None
         if inspect.ismethod(func):
-            cls = self._get_method_self(func)
+            cls = _get_method_self(func)
             query_extra = { 
                 'kind': 'function',
                 'method': func.__name__,
@@ -105,7 +105,7 @@ class Annotator(HasTraits):
         return note['pk'] if note else None
     
     @cachedmethod(cache=attrgetter('_type_cache'),
-                  key=lambda self, type: self._get_type_key(type))
+                  key=lambda type: hashkey(_get_type_key(type)))
     def _cached_notate_type(self, type):
         """ Notate a type, returning the primary key or None.
         """
@@ -174,32 +174,33 @@ class Annotator(HasTraits):
         if isinstance(names, six.string_types):
             names = [ names ]
         return names
+
+
+def _get_func_key(func):
+    """ Key for function cache.
+    """
+    # For methods, we include the type of the object to which the method
+    # is bound. This will differ from the type in the method's qualified
+    # name when there is subclassing without method overriding.
+    if inspect.ismethod(func):
+        type_key = _get_type_key(_get_method_self(func))
+    else:
+        type_key = None
+    return (get_func_full_name(func), type_key)
     
-    def _get_func_key(self, func):
-        """ Key for function cache.
-        """
-        # For methods, we include the type of the object to which the method
-        # is bound. This will differ from the type in the method's qualified
-        # name when there is subclassing without method overriding.
-        if inspect.ismethod(func):
-            type_key = self._get_type_key(self._get_method_self(func))
-        else:
-            type_key = None
-        return (get_func_full_name(func), type_key)
+def _get_type_key(type):
+    """ Key for type cache.
+    """
+    return get_class_full_name(type)
     
-    def _get_type_key(self, type):
-        """ Key for type cache.
-        """
-        return get_class_full_name(type)
-    
-    def _get_method_self(self, func):
-        """ Get the object to which the method is bound.
-        """
-        assert inspect.ismethod(func)
-        if type(func.__self__) is type(object):
-            # Class method: __self__ has type `type`
-            cls = func.__self__
-        else:
-            # Instance method
-            cls = func.__self__.__class__
-        return cls
+def _get_method_self(func):
+    """ Get the object to which the method is bound.
+    """
+    assert inspect.ismethod(func)
+    if type(func.__self__) is type(object):
+        # Class method: __self__ has type `type`
+        cls = func.__self__
+    else:
+        # Instance method
+        cls = func.__self__.__class__
+    return cls
