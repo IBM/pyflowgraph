@@ -88,7 +88,7 @@ class TestInspectNames(unittest.TestCase):
         """
         # Note: `numpy.random.rand` is a method bound to `mtrand.RandomState`.
         # Try running `import numpy, mtrand`.
-        self.assert_(get_func_module_name(np.random.rand).endswith('mtrand'))
+        self.assertTrue(get_func_module_name(np.random.rand).endswith('mtrand'))
         self.assertEqual(get_func_qual_name(np.random.rand), 'RandomState.rand')
     
     @unittest.skipIf(np is None, "requires numpy")
