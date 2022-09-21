@@ -56,11 +56,12 @@ try:
 except ImportError:
     from xml.etree.ElementTree import Element
 
-from ipykernel.jsonutil import json_clean
 import networkx as nx
 from networkx.readwrite.graphml import GraphMLReader as BaseGraphMLReader, \
     GraphMLWriter as BaseGraphMLWriter
 from networkx.utils import open_file, make_str
+
+from .jsonutil import json_clean
 
 
 @open_file(1, mode='wb')

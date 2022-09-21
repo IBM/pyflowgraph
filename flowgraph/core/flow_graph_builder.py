@@ -20,12 +20,12 @@ import sys
 import types
 from weakref import WeakKeyDictionary
 
-from ipykernel.jsonutil import json_clean
 import networkx as nx
 from traitlets import HasTraits, Bool, Dict, Instance, Unicode, default
 
 from .annotator import Annotator
 from .flow_graph import new_flow_graph
+from .jsonutil import json_clean
 from ..kernel.slots import get_slot
 from ..trace.inspect_name import get_class_module_name, get_class_qual_name
 from ..trace.object_tracker import ObjectTracker
