@@ -20,7 +20,7 @@ setup_args = {
         'jsonpickle',
         'click',
         'networkx>=2.0',
-        'cachetools>=3.0',
+        'cachetools>=3, <=4.2.4',
         'blitzdb @ git+https://github.com/adewes/blitzdb.git',
         'sqlalchemy',
         'ipykernel>=4.3.0',
